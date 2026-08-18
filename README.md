@@ -11,6 +11,9 @@ on the phone, requires no account, and does not send data over the internet.
 - Daily unfold count
 - Daily screen-on time while folded and open
 - Open share of total screen-on time
+- Visual open-versus-folded percentage bar
+- Seven-day screen-time history
+- Optional list of apps used while the phone is open
 - Automatic light and dark themes that follow the Android system setting
 - Persistent tracking with a visible Android notification
 - Automatic restart after a device reboot
@@ -82,6 +85,11 @@ Opened requests no internet, location, contacts, camera, or microphone
 permission. Fold statistics are stored in Android `SharedPreferences` inside
 the app's private storage. Uninstalling the app removes that data unless the
 operating system restores it from a device backup.
+
+App-level detail is optional. If enabled, Android's Usage Access lets Opened
+identify the foreground app. Opened records that detail only while the phone is
+open and its screen is interactive. Package names and accumulated durations
+stay in the app's private local storage and are never transmitted.
 
 ## Contributing
 

@@ -5,9 +5,11 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -25,13 +27,18 @@ class MainActivity : Activity() {
     private lateinit var openTimeText: TextView
     private lateinit var foldedTimeText: TextView
     private lateinit var shareText: TextView
+    private lateinit var percentageBar: PercentageBarView
+    private lateinit var weeklyChart: WeeklyChartView
+    private lateinit var appsContainer: LinearLayout
+    private lateinit var appAccessText: TextView
     private lateinit var trackingButton: Button
     private lateinit var resetButton: Button
+    private var dashboardReady = false
 
     private val handler = Handler(Looper.getMainLooper())
     private val refresh = object : Runnable {
         override fun run() {
-            render()
+            if (dashboardReady) render()
             handler.postDelayed(this, 1_000)
         }
     }
@@ -39,16 +46,18 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = FoldStore(this)
-        setContentView(buildScreen())
-        trackingButton.setOnClickListener {
-            if (store.isTracking()) stopTracking() else requestPermissionAndStart()
-        }
-        resetButton.setOnClickListener {
-            store.reset()
-            render()
+        if (getSharedPreferences("opened_ui", MODE_PRIVATE).getBoolean(KEY_USAGE_INTRO_SEEN, false)) {
+            showDashboard()
+        } else {
+            setContentView(buildUsageIntro())
         }
 
         if (store.isTracking()) startForegroundService(Intent(this, FoldTrackingService::class.java))
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (dashboardReady) render()
     }
 
     override fun onStart() {
@@ -110,6 +119,9 @@ class MainActivity : Activity() {
         } else {
             "${(snapshot.todayOpenMs * 100 / measured)}% open"
         }
+        percentageBar.setUsage(snapshot.todayOpenMs, snapshot.todayFoldedMs)
+        weeklyChart.setDays(store.lastSevenDays())
+        renderApps()
 
         trackingButton.text = if (snapshot.tracking) "Stop tracking" else "Start tracking"
         trackingButton.setBackgroundColor(
@@ -120,12 +132,70 @@ class MainActivity : Activity() {
 
     private fun formatDuration(ms: Long): String {
         val totalMinutes = ms / 60_000
+        if (ms > 0 && totalMinutes == 0L) return "<1m"
         val hours = totalMinutes / 60
         val minutes = totalMinutes % 60
         return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
     }
 
-    private fun buildScreen(): ScrollView {
+    private fun showDashboard() {
+        dashboardReady = true
+        setContentView(buildDashboard())
+        trackingButton.setOnClickListener {
+            if (store.isTracking()) stopTracking() else requestPermissionAndStart()
+        }
+        resetButton.setOnClickListener {
+            store.reset()
+            render()
+        }
+        render()
+    }
+
+    private fun buildUsageIntro(): ScrollView {
+        val scroll = ScrollView(this).apply { setBackgroundColor(color(R.color.opened_background)) }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(28), dp(64), dp(28), dp(48))
+        }
+        content.addView(text("More detail, when you want it", 30f, color(R.color.opened_ink), true).bottom(18))
+        content.addView(
+            text(
+                "Opened can show which apps you use on the inner screen. To do that, Android requires optional Usage Access.",
+                17f,
+                color(R.color.opened_muted),
+                false
+            ).bottom(18)
+        )
+        content.addView(
+            text(
+                "Only time spent with the phone open and the screen on is included. App details stay on this phone and are never sent anywhere.",
+                16f,
+                color(R.color.opened_muted),
+                false
+            ).bottom(32)
+        )
+        val enable = actionButton("Enable app details") {
+            markUsageIntroSeen()
+            showDashboard()
+            startActivity(
+                Intent(
+                    Settings.ACTION_USAGE_ACCESS_SETTINGS,
+                    Uri.parse("package:$packageName")
+                )
+            )
+        }
+        content.addView(enable, LinearLayout.LayoutParams(-1, dp(58)).apply { bottomMargin = dp(10) })
+        val skip = actionButton("Continue without app details", transparent = true) {
+            markUsageIntroSeen()
+            showDashboard()
+        }
+        content.addView(skip, LinearLayout.LayoutParams(-1, dp(54)))
+        scroll.addView(content, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        return scroll
+    }
+
+    private fun buildDashboard(): ScrollView {
         val scroll = ScrollView(this).apply { setBackgroundColor(color(R.color.opened_background)) }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -145,7 +215,32 @@ class MainActivity : Activity() {
         content.addView(statRow("Unfolds", "", 0).also { countText = it.second }.first)
         content.addView(statRow("Screen time open", "", 1).also { openTimeText = it.second }.first)
         content.addView(statRow("Screen time folded", "", 2).also { foldedTimeText = it.second }.first)
-        content.addView(statRow("Share of screen time", "", 3).also { shareText = it.second }.first.bottom(30))
+        content.addView(statRow("Share of screen time", "", 3).also { shareText = it.second }.first)
+        percentageBar = PercentageBarView(this)
+        content.addView(percentageBar, LinearLayout.LayoutParams(-1, dp(16)).apply { bottomMargin = dp(34) })
+
+        content.addView(label("LAST 7 DAYS"))
+        weeklyChart = WeeklyChartView(this)
+        content.addView(weeklyChart, LinearLayout.LayoutParams(-1, dp(190)))
+        content.addView(
+            text("Green: open screen time   Gray: folded screen time", 13f, color(R.color.opened_muted), false)
+                .bottom(32)
+        )
+
+        content.addView(label("APPS USED WHILE OPEN"))
+        appAccessText = text("", 14f, color(R.color.opened_muted), false)
+        content.addView(appAccessText.top(8))
+        appsContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        content.addView(appsContainer, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        val accessButton = actionButton("Manage Usage Access", transparent = true) {
+            startActivity(
+                Intent(
+                    Settings.ACTION_USAGE_ACCESS_SETTINGS,
+                    Uri.parse("package:$packageName")
+                )
+            )
+        }
+        content.addView(accessButton, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(24) })
 
         trackingButton = Button(this).apply {
             text = "Start tracking"
@@ -176,6 +271,44 @@ class MainActivity : Activity() {
 
         scroll.addView(content, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         return scroll
+    }
+
+    private fun renderApps() {
+        appsContainer.removeAllViews()
+        if (!UsageAccess.isGranted(this)) {
+            appAccessText.text = "Optional Usage Access is off. Basic fold statistics still work."
+            return
+        }
+        val apps = store.appUsageFor().take(6)
+        appAccessText.text = if (apps.isEmpty()) {
+            "No open-screen app usage recorded yet."
+        } else {
+            "Today"
+        }
+        apps.forEach { usage ->
+            val label = runCatching {
+                val info = packageManager.getApplicationInfo(usage.packageName, 0)
+                packageManager.getApplicationLabel(info).toString()
+            }.getOrDefault(usage.packageName)
+            appsContainer.addView(statRow(label, formatDuration(usage.durationMs), 1).first)
+        }
+    }
+
+    private fun actionButton(label: String, transparent: Boolean = false, action: () -> Unit) =
+        Button(this).apply {
+            text = label
+            textSize = 16f
+            isAllCaps = false
+            setTextColor(if (transparent) color(R.color.opened_accent) else color(R.color.opened_button_text))
+            setBackgroundColor(if (transparent) Color.TRANSPARENT else color(R.color.opened_accent))
+            setOnClickListener { action() }
+        }
+
+    private fun markUsageIntroSeen() {
+        getSharedPreferences("opened_ui", MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_USAGE_INTRO_SEEN, true)
+            .apply()
     }
 
     private fun statRow(title: String, initial: String, index: Int): Pair<LinearLayout, TextView> {
@@ -219,5 +352,6 @@ class MainActivity : Activity() {
 
     companion object {
         private const val NOTIFICATION_PERMISSION_REQUEST = 7
+        private const val KEY_USAGE_INTRO_SEEN = "usage_intro_seen"
     }
 }

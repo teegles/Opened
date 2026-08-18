@@ -17,6 +17,15 @@ data class FoldSnapshot(
     val totalUnfolds: Int
 )
 
+data class DailyUsage(
+    val date: LocalDate,
+    val unfolds: Int,
+    val openMs: Long,
+    val foldedMs: Long
+)
+
+data class AppUsage(val packageName: String, val durationMs: Long)
+
 class FoldStore(context: Context) {
     private val prefs = context.getSharedPreferences("fold_tracking", Context.MODE_PRIVATE)
     private val zone: ZoneId get() = ZoneId.systemDefault()
@@ -42,6 +51,9 @@ class FoldStore(context: Context) {
     }
 
     fun isTracking(): Boolean = prefs.getBoolean(KEY_TRACKING, false)
+
+    fun isOpenAndInteractive(): Boolean =
+        isTracking() && prefs.getBoolean(KEY_INTERACTIVE, false) && readState() == FoldState.OPEN
 
     @Synchronized
     fun recordInteractive(interactive: Boolean, now: Long = System.currentTimeMillis()) {
@@ -106,6 +118,49 @@ class FoldStore(context: Context) {
     }
 
     @Synchronized
+    fun lastSevenDays(now: Long = System.currentTimeMillis()): List<DailyUsage> {
+        val today = dayFor(now)
+        val current = snapshot(now)
+        return (6 downTo 0).map { offset ->
+            val day = today.minusDays(offset.toLong())
+            if (day == today) {
+                DailyUsage(day, current.todayUnfolds, current.todayOpenMs, current.todayFoldedMs)
+            } else {
+                DailyUsage(
+                    day,
+                    prefs.getInt(unfoldKey(day), 0),
+                    prefs.getLong(openKey(day), 0L),
+                    prefs.getLong(foldedKey(day), 0L)
+                )
+            }
+        }
+    }
+
+    @Synchronized
+    fun recordAppUsage(packageName: String, start: Long, end: Long) {
+        if (packageName.isBlank() || end <= start) return
+        var cursor = start
+        val editor = prefs.edit()
+        while (cursor < end) {
+            val date = dayFor(cursor)
+            val nextMidnight = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            val segmentEnd = minOf(end, nextMidnight)
+            val key = appKey(date, packageName)
+            editor.putLong(key, prefs.getLong(key, 0L) + (segmentEnd - cursor))
+            cursor = segmentEnd
+        }
+        editor.apply()
+    }
+
+    fun appUsageFor(day: LocalDate = LocalDate.now(zone)): List<AppUsage> {
+        val prefix = "app_${day}_"
+        return prefs.all.entries.mapNotNull { (key, value) ->
+            if (!key.startsWith(prefix) || value !is Long) null
+            else AppUsage(key.removePrefix(prefix), value)
+        }.sortedByDescending { it.durationMs }
+    }
+
+    @Synchronized
     fun reset(now: Long = System.currentTimeMillis()) {
         val tracking = isTracking()
         val interactive = prefs.getBoolean(KEY_INTERACTIVE, false)
@@ -157,6 +212,7 @@ class FoldStore(context: Context) {
     private fun openKey(day: LocalDate) = "day_${day}_open_ms"
     private fun foldedKey(day: LocalDate) = "day_${day}_folded_ms"
     private fun unfoldKey(day: LocalDate) = "day_${day}_unfolds"
+    private fun appKey(day: LocalDate, packageName: String) = "app_${day}_$packageName"
 
     companion object {
         const val FOLDED_THRESHOLD = 15f

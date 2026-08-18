@@ -7,4 +7,5 @@
     <color name="opened_stop">#694D44</color>
     <color name="opened_danger">#693730</color>
     <color name="opened_button_text">#FFFFFF</color>
+    <color name="opened_folded_bar">#C8C2B4</color>
 </resources>
