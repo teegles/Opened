@@ -9,8 +9,8 @@ on the phone, requires no account, and does not send data over the internet.
 ## Current features
 
 - Daily unfold count
-- Daily folded and open time
-- Open-time percentage
+- Daily screen-on time while folded and open
+- Open share of total screen-on time
 - Automatic light and dark themes that follow the Android system setting
 - Persistent tracking with a visible Android notification
 - Automatic restart after a device reboot
@@ -66,6 +66,11 @@ the angle between hinged sections of a device. Angles at or below 15 degrees
 are treated as folded, and angles at or above 165 degrees are treated as open.
 The gap between those thresholds prevents partially open movement from being
 counted as repeated fold events.
+
+Physical unfolds are counted regardless of whether the display is on. Folded
+and open durations accumulate only while Android reports the device as
+interactive, so leaving the phone open with its screen off does not distort the
+usage percentage. Always-on display time is not included.
 
 Android requires a foreground service and a persistent notification for this
 kind of continuous background tracking. Some manufacturers apply additional

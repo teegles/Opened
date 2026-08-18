@@ -21,6 +21,10 @@ class FoldStore(context: Context) {
     private val prefs = context.getSharedPreferences("fold_tracking", Context.MODE_PRIVATE)
     private val zone: ZoneId get() = ZoneId.systemDefault()
 
+    init {
+        migrateToScreenOnDurations()
+    }
+
     @Synchronized
     fun setTracking(enabled: Boolean, now: Long = System.currentTimeMillis()) {
         if (enabled && isTracking()) return
@@ -38,6 +42,17 @@ class FoldStore(context: Context) {
     }
 
     fun isTracking(): Boolean = prefs.getBoolean(KEY_TRACKING, false)
+
+    @Synchronized
+    fun recordInteractive(interactive: Boolean, now: Long = System.currentTimeMillis()) {
+        val previous = prefs.getBoolean(KEY_INTERACTIVE, false)
+        if (previous == interactive) return
+        commitElapsed(now)
+        prefs.edit()
+            .putBoolean(KEY_INTERACTIVE, interactive)
+            .putLong(KEY_STATE_STARTED, now)
+            .apply()
+    }
 
     @Synchronized
     fun recordAngle(angle: Float, now: Long = System.currentTimeMillis()): Boolean {
@@ -71,7 +86,7 @@ class FoldStore(context: Context) {
         var foldedMs = prefs.getLong(foldedKey(today), 0L)
         val state = readState()
 
-        if (isTracking() && state != FoldState.UNKNOWN) {
+        if (isTracking() && prefs.getBoolean(KEY_INTERACTIVE, false) && state != FoldState.UNKNOWN) {
             val started = prefs.getLong(KEY_STATE_STARTED, now).coerceAtMost(now)
             val todayStart = LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
             val currentElapsed = now - maxOf(started, todayStart)
@@ -93,7 +108,14 @@ class FoldStore(context: Context) {
     @Synchronized
     fun reset(now: Long = System.currentTimeMillis()) {
         val tracking = isTracking()
-        prefs.edit().clear().putBoolean(KEY_TRACKING, tracking).putLong(KEY_STATE_STARTED, now).apply()
+        val interactive = prefs.getBoolean(KEY_INTERACTIVE, false)
+        prefs.edit()
+            .clear()
+            .putBoolean(KEY_TRACKING, tracking)
+            .putBoolean(KEY_INTERACTIVE, interactive)
+            .putInt(KEY_METRIC_VERSION, SCREEN_ON_METRIC_VERSION)
+            .putLong(KEY_STATE_STARTED, now)
+            .apply()
     }
 
     private fun readState(): FoldState = runCatching {
@@ -102,7 +124,7 @@ class FoldStore(context: Context) {
 
     private fun commitElapsed(end: Long) {
         val state = readState()
-        if (state == FoldState.UNKNOWN) return
+        if (state == FoldState.UNKNOWN || !prefs.getBoolean(KEY_INTERACTIVE, false)) return
         var cursor = prefs.getLong(KEY_STATE_STARTED, end).coerceAtMost(end)
         val editor = prefs.edit()
 
@@ -118,6 +140,19 @@ class FoldStore(context: Context) {
         editor.apply()
     }
 
+    private fun migrateToScreenOnDurations() {
+        if (prefs.getInt(KEY_METRIC_VERSION, 1) >= SCREEN_ON_METRIC_VERSION) return
+        val editor = prefs.edit()
+        prefs.all.keys
+            .filter { it.endsWith("_open_ms") || it.endsWith("_folded_ms") }
+            .forEach(editor::remove)
+        editor
+            .putInt(KEY_METRIC_VERSION, SCREEN_ON_METRIC_VERSION)
+            .putBoolean(KEY_INTERACTIVE, false)
+            .putLong(KEY_STATE_STARTED, System.currentTimeMillis())
+            .apply()
+    }
+
     private fun dayFor(time: Long): LocalDate = Instant.ofEpochMilli(time).atZone(zone).toLocalDate()
     private fun openKey(day: LocalDate) = "day_${day}_open_ms"
     private fun foldedKey(day: LocalDate) = "day_${day}_folded_ms"
@@ -131,5 +166,8 @@ class FoldStore(context: Context) {
         private const val KEY_STATE_STARTED = "state_started"
         private const val KEY_ANGLE = "angle"
         private const val KEY_TOTAL_UNFOLDS = "total_unfolds"
+        private const val KEY_INTERACTIVE = "interactive"
+        private const val KEY_METRIC_VERSION = "metric_version"
+        private const val SCREEN_ON_METRIC_VERSION = 2
     }
 }

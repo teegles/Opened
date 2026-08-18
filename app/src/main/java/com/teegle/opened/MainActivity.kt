@@ -143,9 +143,9 @@ class MainActivity : Activity() {
 
         content.addView(label("TODAY"))
         content.addView(statRow("Unfolds", "", 0).also { countText = it.second }.first)
-        content.addView(statRow("Time open", "", 1).also { openTimeText = it.second }.first)
-        content.addView(statRow("Time folded", "", 2).also { foldedTimeText = it.second }.first)
-        content.addView(statRow("Share", "", 3).also { shareText = it.second }.first.bottom(30))
+        content.addView(statRow("Screen time open", "", 1).also { openTimeText = it.second }.first)
+        content.addView(statRow("Screen time folded", "", 2).also { foldedTimeText = it.second }.first)
+        content.addView(statRow("Share of screen time", "", 3).also { shareText = it.second }.first.bottom(30))
 
         trackingButton = Button(this).apply {
             text = "Start tracking"

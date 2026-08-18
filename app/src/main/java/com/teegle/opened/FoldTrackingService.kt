@@ -5,7 +5,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.Color
 import android.hardware.Sensor
@@ -14,11 +17,20 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 
 class FoldTrackingService : Service(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private lateinit var store: FoldStore
     private var hingeSensor: Sensor? = null
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_ON -> store.recordInteractive(true)
+                Intent.ACTION_SCREEN_OFF -> store.recordInteractive(false)
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -28,6 +40,17 @@ class FoldTrackingService : Service(), SensorEventListener {
         createChannel()
         startAsForeground(notification("Starting hinge sensor…"))
         store.setTracking(true)
+        val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+        store.recordInteractive(powerManager.isInteractive)
+        val screenFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(screenReceiver, screenFilter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(screenReceiver, screenFilter)
+        }
         hingeSensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
         } ?: updateNotification("Hinge sensor unavailable")
@@ -39,6 +62,7 @@ class FoldTrackingService : Service(), SensorEventListener {
 
     override fun onDestroy() {
         sensorManager.unregisterListener(this)
+        unregisterReceiver(screenReceiver)
         if (store.isTracking()) store.checkpoint()
         super.onDestroy()
     }
