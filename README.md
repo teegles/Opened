@@ -37,6 +37,26 @@ If you own an untested foldable, please try the app and open a device report.
 Do not assume that an unlisted model is unsupported; it may simply not have
 been tested yet.
 
+## Install the APK
+
+### [Download the latest Opened APK](https://github.com/teegles/Opened/releases/download/v0.2.0-alpha/Opened-v0.2.0-alpha.apk)
+
+No development tools are required. Download the APK directly on your Android
+phone, open the downloaded file, and approve installation from your browser or
+file manager if Android asks.
+
+If the direct download does not start, open the
+[v0.2.0 alpha release page](https://github.com/teegles/Opened/releases/tag/v0.2.0-alpha),
+expand **Assets**, and select `Opened-v0.2.0-alpha.apk`.
+
+The current APK is an early testing release. Android and your browser may warn
+that it came from outside the Play Store. The APK is approximately 6.4 MB and
+has this SHA-256 checksum:
+
+```text
+ad1e6cc92e5259fa4a725913e008ec61a3f395e61cffa16af4cd42b94935df10
+```
+
 ## Build from source
 
 Requirements:
