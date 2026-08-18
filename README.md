@@ -11,6 +11,7 @@ on the phone, requires no account, and does not send data over the internet.
 - Daily unfold count
 - Daily folded and open time
 - Open-time percentage
+- Automatic light and dark themes that follow the Android system setting
 - Persistent tracking with a visible Android notification
 - Automatic restart after a device reboot
 - Local-only storage

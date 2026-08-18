@@ -113,7 +113,7 @@ class MainActivity : Activity() {
 
         trackingButton.text = if (snapshot.tracking) "Stop tracking" else "Start tracking"
         trackingButton.setBackgroundColor(
-            if (snapshot.tracking) Color.rgb(105, 77, 68) else Color.rgb(49, 92, 73)
+            if (snapshot.tracking) color(R.color.opened_stop) else color(R.color.opened_accent)
         )
         resetButton.visibility = if (snapshot.tracking) View.GONE else View.VISIBLE
     }
@@ -126,19 +126,19 @@ class MainActivity : Activity() {
     }
 
     private fun buildScreen(): ScrollView {
-        val scroll = ScrollView(this).apply { setBackgroundColor(BACKGROUND) }
+        val scroll = ScrollView(this).apply { setBackgroundColor(color(R.color.opened_background)) }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(28), dp(24), dp(48))
         }
 
-        content.addView(text("Opened", 34f, INK, true))
-        content.addView(text("Your foldable, in perspective", 16f, MUTED, false).bottom(30))
+        content.addView(text("Opened", 34f, color(R.color.opened_ink), true))
+        content.addView(text("Your foldable, in perspective", 16f, color(R.color.opened_muted), false).bottom(30))
 
         content.addView(label("CURRENT STATE"))
-        stateText = text("Waiting…", 30f, INK, true)
+        stateText = text("Waiting…", 30f, color(R.color.opened_ink), true)
         content.addView(stateText)
-        angleText = text("No reading yet", 15f, MUTED, false)
+        angleText = text("No reading yet", 15f, color(R.color.opened_muted), false)
         content.addView(angleText.bottom(28))
 
         content.addView(label("TODAY"))
@@ -149,7 +149,7 @@ class MainActivity : Activity() {
 
         trackingButton = Button(this).apply {
             text = "Start tracking"
-            setTextColor(Color.WHITE)
+            setTextColor(color(R.color.opened_button_text))
             textSize = 16f
             isAllCaps = false
             minHeight = dp(54)
@@ -158,7 +158,7 @@ class MainActivity : Activity() {
 
         resetButton = Button(this).apply {
             text = "Reset all data"
-            setTextColor(Color.rgb(105, 55, 48))
+            setTextColor(color(R.color.opened_danger))
             textSize = 15f
             isAllCaps = false
             setBackgroundColor(Color.TRANSPARENT)
@@ -169,7 +169,7 @@ class MainActivity : Activity() {
             text(
                 "Tracking stays entirely on this phone. A quiet notification remains visible while tracking is active.",
                 14f,
-                MUTED,
+                color(R.color.opened_muted),
                 false
             ).top(22)
         )
@@ -184,14 +184,14 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(if (index == 0) 12 else 8), 0, dp(8))
         }
-        val titleView = text(title, 17f, Color.rgb(55, 65, 60), false)
-        val valueView = text(initial, 20f, INK, true).apply { gravity = Gravity.END }
+        val titleView = text(title, 17f, color(R.color.opened_muted), false)
+        val valueView = text(initial, 20f, color(R.color.opened_ink), true).apply { gravity = Gravity.END }
         row.addView(titleView, LinearLayout.LayoutParams(0, -2, 1f))
         row.addView(valueView, LinearLayout.LayoutParams(dp(150), -2))
         return row to valueView
     }
 
-    private fun label(value: String) = text(value, 12f, ACCENT, true)
+    private fun label(value: String) = text(value, 12f, color(R.color.opened_accent), true)
 
     private fun text(value: String, size: Float, color: Int, bold: Boolean) = TextView(this).apply {
         text = value
@@ -215,11 +215,9 @@ class MainActivity : Activity() {
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
+    private fun color(resource: Int) = getColor(resource)
+
     companion object {
         private const val NOTIFICATION_PERMISSION_REQUEST = 7
-        private val BACKGROUND = Color.rgb(244, 241, 232)
-        private val INK = Color.rgb(25, 45, 37)
-        private val MUTED = Color.rgb(84, 96, 89)
-        private val ACCENT = Color.rgb(49, 92, 73)
     }
 }
