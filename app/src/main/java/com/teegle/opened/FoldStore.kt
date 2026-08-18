@@ -1,0 +1,135 @@
+package com.teegle.opened
+
+import android.content.Context
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+
+enum class FoldState { UNKNOWN, FOLDED, OPEN }
+
+data class FoldSnapshot(
+    val tracking: Boolean,
+    val state: FoldState,
+    val angle: Float?,
+    val todayUnfolds: Int,
+    val todayOpenMs: Long,
+    val todayFoldedMs: Long,
+    val totalUnfolds: Int
+)
+
+class FoldStore(context: Context) {
+    private val prefs = context.getSharedPreferences("fold_tracking", Context.MODE_PRIVATE)
+    private val zone: ZoneId get() = ZoneId.systemDefault()
+
+    @Synchronized
+    fun setTracking(enabled: Boolean, now: Long = System.currentTimeMillis()) {
+        if (enabled && isTracking()) return
+        if (!enabled) commitElapsed(now)
+        prefs.edit()
+            .putBoolean(KEY_TRACKING, enabled)
+            .putLong(KEY_STATE_STARTED, now)
+            .apply()
+    }
+
+    @Synchronized
+    fun checkpoint(now: Long = System.currentTimeMillis()) {
+        commitElapsed(now)
+        prefs.edit().putLong(KEY_STATE_STARTED, now).apply()
+    }
+
+    fun isTracking(): Boolean = prefs.getBoolean(KEY_TRACKING, false)
+
+    @Synchronized
+    fun recordAngle(angle: Float, now: Long = System.currentTimeMillis()): Boolean {
+        prefs.edit().putFloat(KEY_ANGLE, angle).apply()
+        val previous = readState()
+        val next = when {
+            angle <= FOLDED_THRESHOLD -> FoldState.FOLDED
+            angle >= OPEN_THRESHOLD -> FoldState.OPEN
+            else -> previous
+        }
+        if (next == FoldState.UNKNOWN || next == previous) return false
+
+        commitElapsed(now)
+        val editor = prefs.edit()
+            .putString(KEY_STATE, next.name)
+            .putLong(KEY_STATE_STARTED, now)
+
+        if (previous == FoldState.FOLDED && next == FoldState.OPEN) {
+            val day = dayFor(now)
+            editor.putInt(unfoldKey(day), prefs.getInt(unfoldKey(day), 0) + 1)
+            editor.putInt(KEY_TOTAL_UNFOLDS, prefs.getInt(KEY_TOTAL_UNFOLDS, 0) + 1)
+        }
+        editor.apply()
+        return true
+    }
+
+    @Synchronized
+    fun snapshot(now: Long = System.currentTimeMillis()): FoldSnapshot {
+        val today = dayFor(now)
+        var openMs = prefs.getLong(openKey(today), 0L)
+        var foldedMs = prefs.getLong(foldedKey(today), 0L)
+        val state = readState()
+
+        if (isTracking() && state != FoldState.UNKNOWN) {
+            val started = prefs.getLong(KEY_STATE_STARTED, now).coerceAtMost(now)
+            val todayStart = LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
+            val currentElapsed = now - maxOf(started, todayStart)
+            if (state == FoldState.OPEN) openMs += currentElapsed
+            if (state == FoldState.FOLDED) foldedMs += currentElapsed
+        }
+
+        return FoldSnapshot(
+            tracking = isTracking(),
+            state = state,
+            angle = if (prefs.contains(KEY_ANGLE)) prefs.getFloat(KEY_ANGLE, 0f) else null,
+            todayUnfolds = prefs.getInt(unfoldKey(today), 0),
+            todayOpenMs = openMs,
+            todayFoldedMs = foldedMs,
+            totalUnfolds = prefs.getInt(KEY_TOTAL_UNFOLDS, 0)
+        )
+    }
+
+    @Synchronized
+    fun reset(now: Long = System.currentTimeMillis()) {
+        val tracking = isTracking()
+        prefs.edit().clear().putBoolean(KEY_TRACKING, tracking).putLong(KEY_STATE_STARTED, now).apply()
+    }
+
+    private fun readState(): FoldState = runCatching {
+        FoldState.valueOf(prefs.getString(KEY_STATE, FoldState.UNKNOWN.name)!!)
+    }.getOrDefault(FoldState.UNKNOWN)
+
+    private fun commitElapsed(end: Long) {
+        val state = readState()
+        if (state == FoldState.UNKNOWN) return
+        var cursor = prefs.getLong(KEY_STATE_STARTED, end).coerceAtMost(end)
+        val editor = prefs.edit()
+
+        while (cursor < end) {
+            val date = dayFor(cursor)
+            val nextMidnight = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            val segmentEnd = minOf(end, nextMidnight)
+            val duration = segmentEnd - cursor
+            val key = if (state == FoldState.OPEN) openKey(date) else foldedKey(date)
+            editor.putLong(key, prefs.getLong(key, 0L) + duration)
+            cursor = segmentEnd
+        }
+        editor.apply()
+    }
+
+    private fun dayFor(time: Long): LocalDate = Instant.ofEpochMilli(time).atZone(zone).toLocalDate()
+    private fun openKey(day: LocalDate) = "day_${day}_open_ms"
+    private fun foldedKey(day: LocalDate) = "day_${day}_folded_ms"
+    private fun unfoldKey(day: LocalDate) = "day_${day}_unfolds"
+
+    companion object {
+        const val FOLDED_THRESHOLD = 15f
+        const val OPEN_THRESHOLD = 165f
+        private const val KEY_TRACKING = "tracking"
+        private const val KEY_STATE = "state"
+        private const val KEY_STATE_STARTED = "state_started"
+        private const val KEY_ANGLE = "angle"
+        private const val KEY_TOTAL_UNFOLDS = "total_unfolds"
+    }
+}
