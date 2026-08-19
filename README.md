@@ -1,7 +1,7 @@
 # Opened
 
 Opened is a small, private Android app that counts how often a foldable phone is
-unfolded and compares time spent folded with time spent open.
+unfolded and compares time spent closed with time spent opened.
 
 The app reads Android's standard hinge-angle sensor. Tracking happens locally
 on the phone, requires no account, and does not send data over the internet.
@@ -9,9 +9,9 @@ on the phone, requires no account, and does not send data over the internet.
 ## Current features
 
 - Daily unfold count
-- Daily screen-on time while folded and open
-- Open share of total screen-on time
-- Visual open-versus-folded percentage bar
+- Daily screen-on time while closed and opened
+- Opened share of total screen-on time
+- Visual opened-versus-closed percentage bar
 - Seven-day screen-time history
 - Material You design with wallpaper-derived dynamic color and system dark mode
 - Persistent tracking with a visible Android notification
@@ -38,22 +38,22 @@ been tested yet.
 
 ## Install the APK
 
-### [Download the latest Opened APK](https://github.com/teegles/Opened/releases/download/v0.2.3-alpha/Opened-v0.2.3-alpha.apk)
+### [Download the latest Opened APK](https://github.com/teegles/Opened/releases/download/v0.2.4-alpha/Opened-v0.2.4-alpha.apk)
 
 No development tools are required. Download the APK directly on your Android
 phone, open the downloaded file, and approve installation from your browser or
 file manager if Android asks.
 
 If the direct download does not start, open the
-[v0.2.3 alpha release page](https://github.com/teegles/Opened/releases/tag/v0.2.3-alpha),
-expand **Assets**, and select `Opened-v0.2.3-alpha.apk`.
+[v0.2.4 alpha release page](https://github.com/teegles/Opened/releases/tag/v0.2.4-alpha),
+expand **Assets**, and select `Opened-v0.2.4-alpha.apk`.
 
 The current APK is an early testing release. Android and your browser may warn
 that it came from outside the Play Store. The APK is approximately 28 MB and
 has this SHA-256 checksum:
 
 ```text
-e838e111b1f48c8b0eb0ae3faf91ba88406d15b7693e9ba226f32fc8e3d203ed
+c42c8cfa1d6c94c7339e9d56e58113771a6507ef3cd1333bb29287ef31b9b51f
 ```
 
 ## Build from source
@@ -85,11 +85,11 @@ The APK will be written to
 
 Opened listens for `Sensor.TYPE_HINGE_ANGLE`, the standard Android sensor for
 the angle between hinged sections of a device. Angles at or below 15 degrees
-are treated as folded, and angles at or above 165 degrees are treated as open.
+are treated as closed, and angles at or above 165 degrees are treated as opened.
 The gap between those thresholds prevents partially open movement from being
 counted as repeated fold events.
 
-Physical unfolds are counted regardless of whether the display is on. Folded
+Physical unfolds are counted regardless of whether the display is on. Closed
 and open durations accumulate only while Android reports the device as
 interactive, so leaving the phone open with its screen off does not distort the
 usage percentage. Always-on display time is not included.

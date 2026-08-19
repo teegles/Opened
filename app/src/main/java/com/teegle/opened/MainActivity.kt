@@ -262,8 +262,8 @@ private fun OpenedApp(store: FoldStore, startTracking: () -> Unit, stopTracking:
 @Composable
 private fun StateCard(snapshot: FoldSnapshot) {
     val stateLabel = when (snapshot.state) {
-        FoldState.FOLDED -> "Folded"
-        FoldState.OPEN -> "Open"
+        FoldState.FOLDED -> "Closed"
+        FoldState.OPEN -> "Opened"
         FoldState.UNKNOWN -> if (snapshot.tracking) "Waiting…" else "Not tracking"
     }
     Card(
@@ -303,7 +303,17 @@ private fun FoldGlyph(state: FoldState) {
     val color = MaterialTheme.colorScheme.onPrimaryContainer
     Surface(shape = CircleShape, color = color.copy(alpha = 0.12f)) {
         Canvas(Modifier.size(64.dp).padding(14.dp)) {
-            val gap = if (state == FoldState.FOLDED) size.width * 0.08f else size.width * 0.22f
+            if (state == FoldState.FOLDED) {
+                drawRoundRect(
+                    color,
+                    Offset(size.width * 0.2f, 0f),
+                    Size(size.width * 0.6f, size.height),
+                    CornerRadius(5f, 5f),
+                    style = Stroke(width = 3.5f)
+                )
+                return@Canvas
+            }
+            val gap = size.width * 0.22f
             val panelWidth = (size.width - gap) / 2f
             drawRoundRect(
                 color, Offset.Zero, Size(panelWidth, size.height), CornerRadius(5f, 5f),
@@ -335,12 +345,12 @@ private fun TodayCard(snapshot: FoldSnapshot) {
                 )
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Metric("Open screen", formatDuration(snapshot.todayOpenMs), Modifier.weight(1f))
-                Metric("Folded screen", formatDuration(snapshot.todayFoldedMs), Modifier.weight(1f))
+                Metric("Opened screen", formatDuration(snapshot.todayOpenMs), Modifier.weight(1f))
+                Metric("Closed screen", formatDuration(snapshot.todayFoldedMs), Modifier.weight(1f))
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Open share", style = MaterialTheme.typography.labelLarge)
+                    Text("Opened time", style = MaterialTheme.typography.labelLarge)
                     Text(
                         if (total == 0L) "—" else "${(fraction * 100).toInt()}%",
                         style = MaterialTheme.typography.labelLarge,
@@ -385,8 +395,8 @@ private fun WeekCard(days: List<DailyUsage>) {
             Text("Last 7 days", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             WeeklyBars(days)
             Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                LegendDot(MaterialTheme.colorScheme.primary, "Open")
-                LegendDot(MaterialTheme.colorScheme.secondaryContainer, "Folded")
+                LegendDot(MaterialTheme.colorScheme.primary, "Opened")
+                LegendDot(MaterialTheme.colorScheme.secondaryContainer, "Closed")
             }
         }
     }
@@ -399,6 +409,17 @@ private fun WeeklyBars(days: List<DailyUsage>) {
     val folded = MaterialTheme.colorScheme.secondaryContainer
     val max = days.maxOfOrNull { it.openMs + it.foldedMs }?.coerceAtLeast(1L) ?: 1L
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth()) {
+            days.forEach { day ->
+                Text(
+                    formatChartMinutes(day.openMs + day.foldedMs),
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
         Canvas(Modifier.fillMaxWidth().height(150.dp)) {
             if (days.isEmpty()) return@Canvas
             val slot = size.width / days.size
@@ -453,4 +474,9 @@ private fun formatDuration(ms: Long): String {
     val hours = totalMinutes / 60
     val minutes = totalMinutes % 60
     return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+}
+
+private fun formatChartMinutes(ms: Long): String {
+    if (ms in 1 until 60_000) return "<1m"
+    return "${ms / 60_000}m"
 }

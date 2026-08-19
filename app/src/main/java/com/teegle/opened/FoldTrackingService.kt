@@ -74,8 +74,8 @@ class FoldTrackingService : Service(), SensorEventListener {
         if (changed) {
             val snapshot = store.snapshot()
             val state = when (snapshot.state) {
-                FoldState.FOLDED -> "Folded"
-                FoldState.OPEN -> "Open"
+                FoldState.FOLDED -> "Closed"
+                FoldState.OPEN -> "Opened"
                 FoldState.UNKNOWN -> "Waiting"
             }
             updateNotification("$state · ${snapshot.todayUnfolds} unfolds today")
