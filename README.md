@@ -38,22 +38,22 @@ been tested yet.
 
 ## Install the APK
 
-### [Download the latest Opened APK](https://github.com/teegles/Opened/releases/download/v0.2.1-alpha/Opened-v0.2.1-alpha.apk)
+### [Download the latest Opened APK](https://github.com/teegles/Opened/releases/download/v0.2.2-alpha/Opened-v0.2.2-alpha.apk)
 
 No development tools are required. Download the APK directly on your Android
 phone, open the downloaded file, and approve installation from your browser or
 file manager if Android asks.
 
 If the direct download does not start, open the
-[v0.2.1 alpha release page](https://github.com/teegles/Opened/releases/tag/v0.2.1-alpha),
-expand **Assets**, and select `Opened-v0.2.1-alpha.apk`.
+[v0.2.2 alpha release page](https://github.com/teegles/Opened/releases/tag/v0.2.2-alpha),
+expand **Assets**, and select `Opened-v0.2.2-alpha.apk`.
 
 The current APK is an early testing release. Android and your browser may warn
-that it came from outside the Play Store. The APK is approximately 29 MB and
+that it came from outside the Play Store. The APK is approximately 28 MB and
 has this SHA-256 checksum:
 
 ```text
-9a7f114252bc875fbeea03ac58baf838ed9cd10a03ca8b4e38b88c789c5645e3
+aa2f0ce1e2fc81594f8df58b1649a50e62dfb7d2dedc0e1b3c21f6afec7f9d64
 ```
 
 ## Build from source

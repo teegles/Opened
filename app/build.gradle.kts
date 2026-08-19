@@ -11,8 +11,8 @@ android {
         applicationId = "com.teegle.opened"
         minSdk = 31
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.2.1-alpha"
+        versionCode = 6
+        versionName = "0.2.2-alpha"
     }
 
     buildTypes {
