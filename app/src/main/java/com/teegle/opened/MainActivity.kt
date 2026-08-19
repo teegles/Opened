@@ -89,8 +89,8 @@ class MainActivity : ComponentActivity() {
         if (store.isTracking()) startForegroundService(Intent(this, FoldTrackingService::class.java))
 
         setContent {
-            OpenedTheme {
-                OpenedApp(store, ::startTracking, ::stopTracking)
+            FoldCountTheme {
+                FoldCountApp(store, ::startTracking, ::stopTracking)
             }
         }
     }
@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun OpenedTheme(content: @Composable () -> Unit) {
+private fun FoldCountTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
     val view = LocalView.current
     val dark = isSystemInDarkTheme()
@@ -130,7 +130,7 @@ private fun OpenedTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun OpenedApp(store: FoldStore, startTracking: () -> Unit, stopTracking: () -> Unit) {
+private fun FoldCountApp(store: FoldStore, startTracking: () -> Unit, stopTracking: () -> Unit) {
     val context = LocalContext.current
     var snapshot by remember { mutableStateOf(store.snapshot()) }
     var week by remember { mutableStateOf(store.lastSevenDays()) }
@@ -197,12 +197,12 @@ private fun OpenedApp(store: FoldStore, startTracking: () -> Unit, stopTracking:
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "Opened",
+                        "Fold Count",
                         style = MaterialTheme.typography.displaySmall,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        "Your foldable, in perspective",
+                        "Opened and closed screen time",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -260,7 +260,7 @@ private fun OpenedApp(store: FoldStore, startTracking: () -> Unit, stopTracking:
                     shape = RoundedCornerShape(20.dp)
                 ) {
                     Text(
-                        "Everything stays on this phone. Opened has no internet, location, or app-usage access.",
+                        "Everything stays on this phone. Fold Count has no internet, location, or app-usage access.",
                         modifier = Modifier.padding(18.dp),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant

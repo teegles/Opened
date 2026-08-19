@@ -1,6 +1,6 @@
-# Contributing to Opened
+# Contributing to Fold Count
 
-Thank you for helping make Opened work across more foldable phones.
+Thank you for helping make Fold Count work across more foldable phones.
 
 ## Device testing
 
@@ -8,7 +8,7 @@ When reporting results, include:
 
 - Manufacturer and exact model
 - Android version and manufacturer software version
-- Whether Opened detects folded and open states
+- Whether Fold Count detects closed and opened states
 - Whether the unfold counter increments exactly once
 - Whether tracking continues with the screen off
 - Whether tracking survives a device reboot

@@ -8,9 +8,9 @@
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="Opened"
+        android:label="Fold Count"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Opened">
+        android:theme="@style/Theme.FoldCount">
         <activity
             android:name=".MainActivity"
             android:configChanges="screenSize|smallestScreenSize|orientation|screenLayout"

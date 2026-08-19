@@ -107,7 +107,7 @@ class FoldTrackingService : Service(), SensorEventListener {
         )
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Opened is tracking")
+            .setContentTitle("Fold Count is tracking")
             .setContentText(message)
             .setContentIntent(openIntent)
             .setOngoing(true)

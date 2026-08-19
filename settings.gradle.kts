@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Opened"
+rootProject.name = "FoldCount"
 include(":app")
