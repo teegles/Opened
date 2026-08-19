@@ -11,21 +11,27 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -351,20 +357,7 @@ private fun UsageCard(
         shape = RoundedCornerShape(28.dp)
     ) {
         Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    if (showingWeek) "Past 7 Days" else "Today",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                FilledTonalButton(onClick = onTogglePeriod) {
-                    Text(if (showingWeek) "Today" else "Past 7 Days")
-                }
-            }
+            PeriodToggle(showingWeek, onTogglePeriod)
             Text(
                 "$unfolds unfolds",
                 style = MaterialTheme.typography.titleMedium,
@@ -401,6 +394,69 @@ private fun UsageCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PeriodToggle(showingWeek: Boolean, onTogglePeriod: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest
+    ) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val indicatorOffset by animateDpAsState(
+                targetValue = if (showingWeek) maxWidth / 2 else 0.dp,
+                animationSpec = tween(durationMillis = 280),
+                label = "period indicator"
+            )
+            Surface(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(maxWidth / 2)
+                    .offset(x = indicatorOffset),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary
+            ) {}
+            Row(Modifier.fillMaxSize()) {
+                PeriodOption(
+                    label = "Today",
+                    selected = !showingWeek,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onClick = { if (showingWeek) onTogglePeriod() }
+                )
+                PeriodOption(
+                    label = "Past 7 Days",
+                    selected = showingWeek,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onClick = { if (!showingWeek) onTogglePeriod() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PeriodOption(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier.clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = if (selected) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
     }
 }
 
