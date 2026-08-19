@@ -17,30 +17,18 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
 import android.os.IBinder
-import android.os.Handler
-import android.os.Looper
 import android.os.PowerManager
 
 class FoldTrackingService : Service(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private lateinit var store: FoldStore
-    private lateinit var appUsageTracker: OpenAppUsageTracker
     private var hingeSensor: Sensor? = null
-    private val handler = Handler(Looper.getMainLooper())
-    private val appUsageSample = object : Runnable {
-        override fun run() {
-            appUsageTracker.sample()
-            handler.postDelayed(this, APP_USAGE_SAMPLE_INTERVAL_MS)
-        }
-    }
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            appUsageTracker.sample()
             when (intent?.action) {
                 Intent.ACTION_SCREEN_ON -> store.recordInteractive(true)
                 Intent.ACTION_SCREEN_OFF -> store.recordInteractive(false)
             }
-            appUsageTracker.sample()
         }
     }
 
@@ -54,8 +42,6 @@ class FoldTrackingService : Service(), SensorEventListener {
         store.setTracking(true)
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
         store.recordInteractive(powerManager.isInteractive)
-        appUsageTracker = OpenAppUsageTracker(this, store)
-        handler.post(appUsageSample)
         val screenFilter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_SCREEN_OFF)
@@ -75,8 +61,6 @@ class FoldTrackingService : Service(), SensorEventListener {
     }
 
     override fun onDestroy() {
-        appUsageTracker.sample()
-        handler.removeCallbacks(appUsageSample)
         sensorManager.unregisterListener(this)
         unregisterReceiver(screenReceiver)
         if (store.isTracking()) store.checkpoint()
@@ -86,9 +70,7 @@ class FoldTrackingService : Service(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != Sensor.TYPE_HINGE_ANGLE) return
         val angle = event.values.firstOrNull() ?: return
-        appUsageTracker.sample()
         val changed = store.recordAngle(angle)
-        appUsageTracker.sample()
         if (changed) {
             val snapshot = store.snapshot()
             val state = when (snapshot.state) {
@@ -150,6 +132,5 @@ class FoldTrackingService : Service(), SensorEventListener {
     companion object {
         private const val CHANNEL_ID = "fold_tracking"
         private const val NOTIFICATION_ID = 1001
-        private const val APP_USAGE_SAMPLE_INTERVAL_MS = 10_000L
     }
 }

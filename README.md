@@ -13,8 +13,7 @@ on the phone, requires no account, and does not send data over the internet.
 - Open share of total screen-on time
 - Visual open-versus-folded percentage bar
 - Seven-day screen-time history
-- Optional list of apps used while the phone is open
-- Automatic light and dark themes that follow the Android system setting
+- Material You design with wallpaper-derived dynamic color and system dark mode
 - Persistent tracking with a visible Android notification
 - Automatic restart after a device reboot
 - Local-only storage
@@ -39,22 +38,22 @@ been tested yet.
 
 ## Install the APK
 
-### [Download the latest Opened APK](https://github.com/teegles/Opened/releases/download/v0.2.0-alpha/Opened-v0.2.0-alpha.apk)
+### [Download the latest Opened APK](https://github.com/teegles/Opened/releases/download/v0.2.1-alpha/Opened-v0.2.1-alpha.apk)
 
 No development tools are required. Download the APK directly on your Android
 phone, open the downloaded file, and approve installation from your browser or
 file manager if Android asks.
 
 If the direct download does not start, open the
-[v0.2.0 alpha release page](https://github.com/teegles/Opened/releases/tag/v0.2.0-alpha),
-expand **Assets**, and select `Opened-v0.2.0-alpha.apk`.
+[v0.2.1 alpha release page](https://github.com/teegles/Opened/releases/tag/v0.2.1-alpha),
+expand **Assets**, and select `Opened-v0.2.1-alpha.apk`.
 
 The current APK is an early testing release. Android and your browser may warn
-that it came from outside the Play Store. The APK is approximately 6.4 MB and
+that it came from outside the Play Store. The APK is approximately 29 MB and
 has this SHA-256 checksum:
 
 ```text
-ad1e6cc92e5259fa4a725913e008ec61a3f395e61cffa16af4cd42b94935df10
+9a7f114252bc875fbeea03ac58baf838ed9cd10a03ca8b4e38b88c789c5645e3
 ```
 
 ## Build from source
@@ -106,10 +105,9 @@ permission. Fold statistics are stored in Android `SharedPreferences` inside
 the app's private storage. Uninstalling the app removes that data unless the
 operating system restores it from a device backup.
 
-App-level detail is optional. If enabled, Android's Usage Access lets Opened
-identify the foreground app. Opened records that detail only while the phone is
-open and its screen is interactive. Package names and accumulated durations
-stay in the app's private local storage and are never transmitted.
+Opened does not request Android Usage Access and does not inspect which apps
+you use. It tracks only the fold state, screen-interactive state, and locally
+aggregated durations needed for the dashboard.
 
 ## Contributing
 

@@ -1,357 +1,425 @@
 package com.teegle.opened
 
 import android.Manifest
-import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
-import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.provider.Settings
-import android.util.TypedValue
-import android.view.Gravity
-import android.view.View
-import android.view.ViewGroup
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import java.time.format.TextStyle
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
     private lateinit var store: FoldStore
-    private lateinit var stateText: TextView
-    private lateinit var angleText: TextView
-    private lateinit var countText: TextView
-    private lateinit var openTimeText: TextView
-    private lateinit var foldedTimeText: TextView
-    private lateinit var shareText: TextView
-    private lateinit var percentageBar: PercentageBarView
-    private lateinit var weeklyChart: WeeklyChartView
-    private lateinit var appsContainer: LinearLayout
-    private lateinit var appAccessText: TextView
-    private lateinit var trackingButton: Button
-    private lateinit var resetButton: Button
-    private var dashboardReady = false
-
-    private val handler = Handler(Looper.getMainLooper())
-    private val refresh = object : Runnable {
-        override fun run() {
-            if (dashboardReady) render()
-            handler.postDelayed(this, 1_000)
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         store = FoldStore(this)
-        if (getSharedPreferences("opened_ui", MODE_PRIVATE).getBoolean(KEY_USAGE_INTRO_SEEN, false)) {
-            showDashboard()
-        } else {
-            setContentView(buildUsageIntro())
-        }
-
         if (store.isTracking()) startForegroundService(Intent(this, FoldTrackingService::class.java))
-    }
 
-    override fun onResume() {
-        super.onResume()
-        if (dashboardReady) render()
-    }
-
-    override fun onStart() {
-        super.onStart()
-        handler.post(refresh)
-    }
-
-    override fun onStop() {
-        handler.removeCallbacks(refresh)
-        super.onStop()
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == NOTIFICATION_PERMISSION_REQUEST) startTracking()
-    }
-
-    private fun requestPermissionAndStart() {
-        if (android.os.Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
-        } else {
-            startTracking()
+        setContent {
+            OpenedTheme {
+                OpenedApp(store, ::startTracking, ::stopTracking)
+            }
         }
     }
 
     private fun startTracking() {
         store.setTracking(true)
         startForegroundService(Intent(this, FoldTrackingService::class.java))
-        render()
     }
 
     private fun stopTracking() {
         store.setTracking(false)
         stopService(Intent(this, FoldTrackingService::class.java))
-        render()
+    }
+}
+
+@Composable
+private fun OpenedTheme(content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val dark = isSystemInDarkTheme()
+    val colors = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dark -> dynamicDarkColorScheme(context)
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> dynamicLightColorScheme(context)
+        dark -> darkColorScheme(primary = Color(0xFF79C7A2), secondary = Color(0xFFB2CCBD))
+        else -> lightColorScheme(primary = Color(0xFF315C49), secondary = Color(0xFF526A5E))
+    }
+    MaterialTheme(colorScheme = colors, content = content)
+}
+
+@Composable
+private fun OpenedApp(store: FoldStore, startTracking: () -> Unit, stopTracking: () -> Unit) {
+    val context = LocalContext.current
+    var snapshot by remember { mutableStateOf(store.snapshot()) }
+    var week by remember { mutableStateOf(store.lastSevenDays()) }
+    var showResetDialog by remember { mutableStateOf(false) }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) {
+        startTracking()
+        snapshot = store.snapshot()
     }
 
-    private fun render() {
-        val snapshot = store.snapshot()
-        stateText.text = when (snapshot.state) {
-            FoldState.FOLDED -> "Folded"
-            FoldState.OPEN -> "Open"
-            FoldState.UNKNOWN -> if (snapshot.tracking) "Waiting…" else "Not tracking"
+    LaunchedEffect(Unit) {
+        while (true) {
+            snapshot = store.snapshot()
+            week = store.lastSevenDays()
+            delay(1_000)
         }
-        angleText.text = snapshot.angle?.let { "${"%.1f".format(it)}° hinge angle" } ?: "No reading yet"
-        countText.text = snapshot.todayUnfolds.toString()
-        openTimeText.text = formatDuration(snapshot.todayOpenMs)
-        foldedTimeText.text = formatDuration(snapshot.todayFoldedMs)
+    }
 
-        val measured = snapshot.todayOpenMs + snapshot.todayFoldedMs
-        shareText.text = if (measured == 0L) {
-            "—"
-        } else {
-            "${(snapshot.todayOpenMs * 100 / measured)}% open"
-        }
-        percentageBar.setUsage(snapshot.todayOpenMs, snapshot.todayFoldedMs)
-        weeklyChart.setDays(store.lastSevenDays())
-        renderApps()
-
-        trackingButton.text = if (snapshot.tracking) "Stop tracking" else "Start tracking"
-        trackingButton.setBackgroundColor(
-            if (snapshot.tracking) color(R.color.opened_stop) else color(R.color.opened_accent)
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("Reset all statistics?") },
+            text = { Text("This permanently removes unfold counts and screen-time history from this phone.") },
+            confirmButton = {
+                Button(onClick = {
+                    store.reset()
+                    snapshot = store.snapshot()
+                    week = store.lastSevenDays()
+                    showResetDialog = false
+                }) { Text("Reset") }
+            },
+            dismissButton = {
+                FilledTonalButton(onClick = { showResetDialog = false }) { Text("Cancel") }
+            }
         )
-        resetButton.visibility = if (snapshot.tracking) View.GONE else View.VISIBLE
     }
 
-    private fun formatDuration(ms: Long): String {
-        val totalMinutes = ms / 60_000
-        if (ms > 0 && totalMinutes == 0L) return "<1m"
-        val hours = totalMinutes / 60
-        val minutes = totalMinutes % 60
-        return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+    Scaffold(containerColor = MaterialTheme.colorScheme.surface) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 20.dp,
+                top = innerPadding.calculateTopPadding() + 20.dp,
+                end = 20.dp,
+                bottom = innerPadding.calculateBottomPadding() + 32.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "Opened",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Your foldable, in perspective",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            item { StateCard(snapshot) }
+            item { TodayCard(snapshot) }
+            item { WeekCard(week) }
+            item {
+                if (snapshot.tracking) {
+                    OutlinedButton(
+                        onClick = {
+                            stopTracking()
+                            snapshot = store.snapshot()
+                        },
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
+                    ) { Text("Stop tracking") }
+                } else {
+                    Button(
+                        onClick = {
+                            if (Build.VERSION.SDK_INT >= 33 &&
+                                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+                                PackageManager.PERMISSION_GRANTED
+                            ) {
+                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                startTracking()
+                                snapshot = store.snapshot()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
+                    ) { Text("Start tracking") }
+                }
+            }
+            if (!snapshot.tracking) {
+                item {
+                    FilledTonalButton(
+                        onClick = { showResetDialog = true },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) { Text("Reset all data") }
+                }
+            }
+            item {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text(
+                        "Everything stays on this phone. Opened has no internet, location, or app-usage access.",
+                        modifier = Modifier.padding(18.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
+}
 
-    private fun showDashboard() {
-        dashboardReady = true
-        setContentView(buildDashboard())
-        trackingButton.setOnClickListener {
-            if (store.isTracking()) stopTracking() else requestPermissionAndStart()
-        }
-        resetButton.setOnClickListener {
-            store.reset()
-            render()
-        }
-        render()
+@Composable
+private fun StateCard(snapshot: FoldSnapshot) {
+    val stateLabel = when (snapshot.state) {
+        FoldState.FOLDED -> "Folded"
+        FoldState.OPEN -> "Open"
+        FoldState.UNKNOWN -> if (snapshot.tracking) "Waiting…" else "Not tracking"
     }
-
-    private fun buildUsageIntro(): ScrollView {
-        val scroll = ScrollView(this).apply { setBackgroundColor(color(R.color.opened_background)) }
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(28), dp(64), dp(28), dp(48))
-        }
-        content.addView(text("More detail, when you want it", 30f, color(R.color.opened_ink), true).bottom(18))
-        content.addView(
-            text(
-                "Opened can show which apps you use on the inner screen. To do that, Android requires optional Usage Access.",
-                17f,
-                color(R.color.opened_muted),
-                false
-            ).bottom(18)
-        )
-        content.addView(
-            text(
-                "Only time spent with the phone open and the screen on is included. App details stay on this phone and are never sent anywhere.",
-                16f,
-                color(R.color.opened_muted),
-                false
-            ).bottom(32)
-        )
-        val enable = actionButton("Enable app details") {
-            markUsageIntroSeen()
-            showDashboard()
-            startActivity(
-                Intent(
-                    Settings.ACTION_USAGE_ACCESS_SETTINGS,
-                    Uri.parse("package:$packageName")
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        shape = RoundedCornerShape(28.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(22.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FoldGlyph(snapshot.state)
+            Spacer(Modifier.width(18.dp))
+            Column {
+                Text(
+                    "CURRENT STATE",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f)
                 )
+                Text(
+                    stateLabel,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Text(
+                    snapshot.angle?.let { "${"%.1f".format(it)}° hinge angle" } ?: "No reading yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FoldGlyph(state: FoldState) {
+    val color = MaterialTheme.colorScheme.onPrimaryContainer
+    Surface(shape = CircleShape, color = color.copy(alpha = 0.12f)) {
+        Canvas(Modifier.size(64.dp).padding(14.dp)) {
+            val gap = if (state == FoldState.FOLDED) size.width * 0.08f else size.width * 0.22f
+            val panelWidth = (size.width - gap) / 2f
+            drawRoundRect(
+                color, Offset.Zero, Size(panelWidth, size.height), CornerRadius(5f, 5f),
+                style = Stroke(width = 3.5f)
+            )
+            drawRoundRect(
+                color, Offset(panelWidth + gap, 0f), Size(panelWidth, size.height), CornerRadius(5f, 5f),
+                style = Stroke(width = 3.5f)
             )
         }
-        content.addView(enable, LinearLayout.LayoutParams(-1, dp(58)).apply { bottomMargin = dp(10) })
-        val skip = actionButton("Continue without app details", transparent = true) {
-            markUsageIntroSeen()
-            showDashboard()
-        }
-        content.addView(skip, LinearLayout.LayoutParams(-1, dp(54)))
-        scroll.addView(content, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        return scroll
     }
+}
 
-    private fun buildDashboard(): ScrollView {
-        val scroll = ScrollView(this).apply { setBackgroundColor(color(R.color.opened_background)) }
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(28), dp(24), dp(48))
-        }
-
-        content.addView(text("Opened", 34f, color(R.color.opened_ink), true))
-        content.addView(text("Your foldable, in perspective", 16f, color(R.color.opened_muted), false).bottom(30))
-
-        content.addView(label("CURRENT STATE"))
-        stateText = text("Waiting…", 30f, color(R.color.opened_ink), true)
-        content.addView(stateText)
-        angleText = text("No reading yet", 15f, color(R.color.opened_muted), false)
-        content.addView(angleText.bottom(28))
-
-        content.addView(label("TODAY"))
-        content.addView(statRow("Unfolds", "", 0).also { countText = it.second }.first)
-        content.addView(statRow("Screen time open", "", 1).also { openTimeText = it.second }.first)
-        content.addView(statRow("Screen time folded", "", 2).also { foldedTimeText = it.second }.first)
-        content.addView(statRow("Share of screen time", "", 3).also { shareText = it.second }.first)
-        percentageBar = PercentageBarView(this)
-        content.addView(percentageBar, LinearLayout.LayoutParams(-1, dp(16)).apply { bottomMargin = dp(34) })
-
-        content.addView(label("LAST 7 DAYS"))
-        weeklyChart = WeeklyChartView(this)
-        content.addView(weeklyChart, LinearLayout.LayoutParams(-1, dp(190)))
-        content.addView(
-            text("Green: open screen time   Gray: folded screen time", 13f, color(R.color.opened_muted), false)
-                .bottom(32)
-        )
-
-        content.addView(label("APPS USED WHILE OPEN"))
-        appAccessText = text("", 14f, color(R.color.opened_muted), false)
-        content.addView(appAccessText.top(8))
-        appsContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(appsContainer, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
-        val accessButton = actionButton("Manage Usage Access", transparent = true) {
-            startActivity(
-                Intent(
-                    Settings.ACTION_USAGE_ACCESS_SETTINGS,
-                    Uri.parse("package:$packageName")
+@Composable
+private fun TodayCard(snapshot: FoldSnapshot) {
+    val total = snapshot.todayOpenMs + snapshot.todayFoldedMs
+    val fraction = if (total > 0) snapshot.todayOpenMs.toFloat() / total else 0f
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = RoundedCornerShape(28.dp)
+    ) {
+        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Today", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "${snapshot.todayUnfolds} unfolds",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
                 )
-            )
-        }
-        content.addView(accessButton, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(24) })
-
-        trackingButton = Button(this).apply {
-            text = "Start tracking"
-            setTextColor(color(R.color.opened_button_text))
-            textSize = 16f
-            isAllCaps = false
-            minHeight = dp(54)
-        }
-        content.addView(trackingButton, LinearLayout.LayoutParams(-1, dp(58)).apply { bottomMargin = dp(12) })
-
-        resetButton = Button(this).apply {
-            text = "Reset all data"
-            setTextColor(color(R.color.opened_danger))
-            textSize = 15f
-            isAllCaps = false
-            setBackgroundColor(Color.TRANSPARENT)
-        }
-        content.addView(resetButton, LinearLayout.LayoutParams(-1, dp(52)))
-
-        content.addView(
-            text(
-                "Tracking stays entirely on this phone. A quiet notification remains visible while tracking is active.",
-                14f,
-                color(R.color.opened_muted),
-                false
-            ).top(22)
-        )
-
-        scroll.addView(content, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        return scroll
-    }
-
-    private fun renderApps() {
-        appsContainer.removeAllViews()
-        if (!UsageAccess.isGranted(this)) {
-            appAccessText.text = "Optional Usage Access is off. Basic fold statistics still work."
-            return
-        }
-        val apps = store.appUsageFor().take(6)
-        appAccessText.text = if (apps.isEmpty()) {
-            "No open-screen app usage recorded yet."
-        } else {
-            "Today"
-        }
-        apps.forEach { usage ->
-            val label = runCatching {
-                val info = packageManager.getApplicationInfo(usage.packageName, 0)
-                packageManager.getApplicationLabel(info).toString()
-            }.getOrDefault(usage.packageName)
-            appsContainer.addView(statRow(label, formatDuration(usage.durationMs), 1).first)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Metric("Open screen", formatDuration(snapshot.todayOpenMs), Modifier.weight(1f))
+                Metric("Folded screen", formatDuration(snapshot.todayFoldedMs), Modifier.weight(1f))
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Open share", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        if (total == 0L) "—" else "${(fraction * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                LinearProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier.fillMaxWidth().height(12.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    strokeCap = StrokeCap.Round,
+                    gapSize = 0.dp,
+                    drawStopIndicator = {}
+                )
+            }
         }
     }
+}
 
-    private fun actionButton(label: String, transparent: Boolean = false, action: () -> Unit) =
-        Button(this).apply {
-            text = label
-            textSize = 16f
-            isAllCaps = false
-            setTextColor(if (transparent) color(R.color.opened_accent) else color(R.color.opened_button_text))
-            setBackgroundColor(if (transparent) Color.TRANSPARENT else color(R.color.opened_accent))
-            setOnClickListener { action() }
+@Composable
+private fun Metric(label: String, value: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         }
-
-    private fun markUsageIntroSeen() {
-        getSharedPreferences("opened_ui", MODE_PRIVATE)
-            .edit()
-            .putBoolean(KEY_USAGE_INTRO_SEEN, true)
-            .apply()
     }
+}
 
-    private fun statRow(title: String, initial: String, index: Int): Pair<LinearLayout, TextView> {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(if (index == 0) 12 else 8), 0, dp(8))
+@Composable
+private fun WeekCard(days: List<DailyUsage>) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = RoundedCornerShape(28.dp)
+    ) {
+        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Last 7 days", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            WeeklyBars(days)
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                LegendDot(MaterialTheme.colorScheme.primary, "Open")
+                LegendDot(MaterialTheme.colorScheme.secondaryContainer, "Folded")
+            }
         }
-        val titleView = text(title, 17f, color(R.color.opened_muted), false)
-        val valueView = text(initial, 20f, color(R.color.opened_ink), true).apply { gravity = Gravity.END }
-        row.addView(titleView, LinearLayout.LayoutParams(0, -2, 1f))
-        row.addView(valueView, LinearLayout.LayoutParams(dp(150), -2))
-        return row to valueView
     }
+}
 
-    private fun label(value: String) = text(value, 12f, color(R.color.opened_accent), true)
-
-    private fun text(value: String, size: Float, color: Int, bold: Boolean) = TextView(this).apply {
-        text = value
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, size)
-        setTextColor(color)
-        gravity = Gravity.START
-        if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
+@Composable
+private fun WeeklyBars(days: List<DailyUsage>) {
+    val locale = LocalConfiguration.current.locales[0]
+    val primary = MaterialTheme.colorScheme.primary
+    val folded = MaterialTheme.colorScheme.secondaryContainer
+    val max = days.maxOfOrNull { it.openMs + it.foldedMs }?.coerceAtLeast(1L) ?: 1L
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(150.dp)) {
+            if (days.isEmpty()) return@Canvas
+            val slot = size.width / days.size
+            val width = slot * 0.48f
+            days.forEachIndexed { index, day ->
+                val total = day.openMs + day.foldedMs
+                val totalHeight = size.height * total / max
+                val openHeight = if (total > 0) totalHeight * day.openMs / total else 0f
+                val x = slot * index + (slot - width) / 2f
+                drawRoundRect(
+                    folded,
+                    Offset(x, size.height - totalHeight),
+                    Size(width, totalHeight),
+                    CornerRadius(10f, 10f)
+                )
+                if (openHeight > 0) {
+                    drawRoundRect(
+                        primary,
+                        Offset(x, size.height - totalHeight),
+                        Size(width, openHeight + 4f),
+                        CornerRadius(10f, 10f)
+                    )
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth()) {
+            days.forEach { day ->
+                Text(
+                    day.date.dayOfWeek.getDisplayName(TextStyle.NARROW, locale),
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
+}
 
-    private fun TextView.bottom(value: Int): TextView = apply {
-        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(value) }
+@Composable
+private fun LegendDot(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(10.dp).background(color, CircleShape))
+        Spacer(Modifier.width(7.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
 
-    private fun LinearLayout.bottom(value: Int): LinearLayout = apply {
-        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(value) }
-    }
-
-    private fun TextView.top(value: Int): TextView = apply {
-        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(value) }
-    }
-
-    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-
-    private fun color(resource: Int) = getColor(resource)
-
-    companion object {
-        private const val NOTIFICATION_PERMISSION_REQUEST = 7
-        private const val KEY_USAGE_INTRO_SEEN = "usage_intro_seen"
-    }
+private fun formatDuration(ms: Long): String {
+    val totalMinutes = ms / 60_000
+    if (ms > 0 && totalMinutes == 0L) return "<1m"
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 }
