@@ -73,7 +73,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import kotlinx.coroutines.delay
@@ -388,10 +387,6 @@ private fun UsageCard(
             }
             if (showingWeek) {
                 WeeklyBars(days)
-                Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                    LegendDot(MaterialTheme.colorScheme.primary, "Opened")
-                    LegendDot(MaterialTheme.colorScheme.secondaryContainer, "Closed")
-                }
             }
         }
     }
@@ -478,54 +473,59 @@ private fun Metric(label: String, value: String, modifier: Modifier = Modifier) 
 private fun WeeklyBars(days: List<DailyUsage>) {
     val locale = LocalConfiguration.current.locales[0]
     val primary = MaterialTheme.colorScheme.primary
-    val folded = MaterialTheme.colorScheme.secondaryContainer
+    val closed = MaterialTheme.colorScheme.secondaryContainer
     val max = days.maxOfOrNull { it.openMs + it.foldedMs }?.coerceAtLeast(1L) ?: 1L
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth()) {
-            days.forEach { day ->
-                Text(
-                    formatChartMinutes(day.openMs + day.foldedMs),
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        Canvas(Modifier.fillMaxWidth().height(150.dp)) {
-            if (days.isEmpty()) return@Canvas
-            val slot = size.width / days.size
-            val width = slot * 0.48f
-            days.forEachIndexed { index, day ->
-                val total = day.openMs + day.foldedMs
-                val totalHeight = size.height * total / max
-                val openHeight = if (total > 0) totalHeight * day.openMs / total else 0f
-                val x = slot * index + (slot - width) / 2f
-                drawRoundRect(
-                    folded,
-                    Offset(x, size.height - totalHeight),
-                    Size(width, totalHeight),
-                    CornerRadius(10f, 10f)
-                )
-                if (openHeight > 0) {
-                    drawRoundRect(
-                        primary,
-                        Offset(x, size.height - totalHeight),
-                        Size(width, openHeight + 4f),
-                        CornerRadius(10f, 10f)
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(
+            "Screen-on time by day",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        days.forEach { day ->
+            val total = day.openMs + day.foldedMs
+            val usageFraction = total.toFloat() / max.toFloat()
+            val openedFraction = if (total > 0) day.openMs.toFloat() / total else 0f
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        day.date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "${formatDuration(total)} total",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
-        }
-        Row(Modifier.fillMaxWidth()) {
-            days.forEach { day ->
-                Text(
-                    day.date.dayOfWeek.getDisplayName(TextStyle.NARROW, locale),
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                BoxWithConstraints(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(12.dp)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
+                ) {
+                    val barWidth = maxWidth * usageFraction
+                    Box(
+                        Modifier
+                            .fillMaxHeight()
+                            .width(barWidth)
+                            .background(closed, CircleShape)
+                    )
+                    Box(
+                        Modifier
+                            .fillMaxHeight()
+                            .width(barWidth * openedFraction)
+                            .background(primary, CircleShape)
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                    LegendDot(primary, "Opened ${formatDuration(day.openMs)}")
+                    LegendDot(closed, "Closed ${formatDuration(day.foldedMs)}")
+                }
             }
         }
     }
@@ -546,9 +546,4 @@ private fun formatDuration(ms: Long): String {
     val hours = totalMinutes / 60
     val minutes = totalMinutes % 60
     return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
-}
-
-private fun formatChartMinutes(ms: Long): String {
-    if (ms in 1 until 60_000) return "<1m"
-    return "${ms / 60_000}m"
 }
