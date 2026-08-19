@@ -76,6 +76,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import kotlinx.coroutines.delay
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 
 class MainActivity : ComponentActivity() {
@@ -472,6 +473,7 @@ private fun Metric(label: String, value: String, modifier: Modifier = Modifier) 
 @Composable
 private fun WeeklyBars(days: List<DailyUsage>) {
     val locale = LocalConfiguration.current.locales[0]
+    val dateFormatter = remember(locale) { DateTimeFormatter.ofPattern("MMM d", locale) }
     val primary = MaterialTheme.colorScheme.primary
     val closed = MaterialTheme.colorScheme.secondaryContainer
     val max = days.maxOfOrNull { it.openMs + it.foldedMs }?.coerceAtLeast(1L) ?: 1L
@@ -481,7 +483,7 @@ private fun WeeklyBars(days: List<DailyUsage>) {
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
-        days.forEach { day ->
+        days.asReversed().forEach { day ->
             val total = day.openMs + day.foldedMs
             val usageFraction = total.toFloat() / max.toFloat()
             val openedFraction = if (total > 0) day.openMs.toFloat() / total else 0f
@@ -492,7 +494,8 @@ private fun WeeklyBars(days: List<DailyUsage>) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        day.date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale),
+                        "${day.date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)} · " +
+                            day.date.format(dateFormatter),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
                     )
