@@ -128,6 +128,7 @@ private fun OpenedApp(store: FoldStore, startTracking: () -> Unit, stopTracking:
     val context = LocalContext.current
     var snapshot by remember { mutableStateOf(store.snapshot()) }
     var week by remember { mutableStateOf(store.lastSevenDays()) }
+    var showingWeek by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
     val notificationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -202,8 +203,14 @@ private fun OpenedApp(store: FoldStore, startTracking: () -> Unit, stopTracking:
                 }
             }
             item { StateCard(snapshot) }
-            item { TodayCard(snapshot) }
-            item { WeekCard(week) }
+            item {
+                UsageCard(
+                    snapshot = snapshot,
+                    days = week,
+                    showingWeek = showingWeek,
+                    onTogglePeriod = { showingWeek = !showingWeek }
+                )
+            }
             item {
                 if (snapshot.tracking) {
                     OutlinedButton(
@@ -328,25 +335,44 @@ private fun FoldGlyph(state: FoldState) {
 }
 
 @Composable
-private fun TodayCard(snapshot: FoldSnapshot) {
-    val total = snapshot.todayOpenMs + snapshot.todayFoldedMs
-    val fraction = if (total > 0) snapshot.todayOpenMs.toFloat() / total else 0f
+private fun UsageCard(
+    snapshot: FoldSnapshot,
+    days: List<DailyUsage>,
+    showingWeek: Boolean,
+    onTogglePeriod: () -> Unit
+) {
+    val openMs = if (showingWeek) days.sumOf { it.openMs } else snapshot.todayOpenMs
+    val closedMs = if (showingWeek) days.sumOf { it.foldedMs } else snapshot.todayFoldedMs
+    val unfolds = if (showingWeek) days.sumOf { it.unfolds } else snapshot.todayUnfolds
+    val total = openMs + closedMs
+    val fraction = if (total > 0) openMs.toFloat() / total else 0f
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = RoundedCornerShape(28.dp)
     ) {
         Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Today", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    "${snapshot.todayUnfolds} unfolds",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    if (showingWeek) "Past 7 Days" else "Today",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold
                 )
+                FilledTonalButton(onClick = onTogglePeriod) {
+                    Text(if (showingWeek) "Today" else "Past 7 Days")
+                }
             }
+            Text(
+                "$unfolds unfolds",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Metric("Opened screen", formatDuration(snapshot.todayOpenMs), Modifier.weight(1f))
-                Metric("Closed screen", formatDuration(snapshot.todayFoldedMs), Modifier.weight(1f))
+                Metric("Opened screen", formatDuration(openMs), Modifier.weight(1f))
+                Metric("Closed screen", formatDuration(closedMs), Modifier.weight(1f))
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -367,6 +393,13 @@ private fun TodayCard(snapshot: FoldSnapshot) {
                     drawStopIndicator = {}
                 )
             }
+            if (showingWeek) {
+                WeeklyBars(days)
+                Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                    LegendDot(MaterialTheme.colorScheme.primary, "Opened")
+                    LegendDot(MaterialTheme.colorScheme.secondaryContainer, "Closed")
+                }
+            }
         }
     }
 }
@@ -381,23 +414,6 @@ private fun Metric(label: String, value: String, modifier: Modifier = Modifier) 
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-@Composable
-private fun WeekCard(days: List<DailyUsage>) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        shape = RoundedCornerShape(28.dp)
-    ) {
-        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Last 7 days", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            WeeklyBars(days)
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                LegendDot(MaterialTheme.colorScheme.primary, "Opened")
-                LegendDot(MaterialTheme.colorScheme.secondaryContainer, "Closed")
-            }
         }
     }
 }

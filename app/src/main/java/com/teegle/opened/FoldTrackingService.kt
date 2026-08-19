@@ -38,7 +38,7 @@ class FoldTrackingService : Service(), SensorEventListener {
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         hingeSensor = sensorManager.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE)
         createChannel()
-        startAsForeground(notification("Starting hinge sensor…"))
+        startAsForeground(notification("${store.snapshot().todayUnfolds} unfolds today"))
         store.setTracking(true)
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
         store.recordInteractive(powerManager.isInteractive)
