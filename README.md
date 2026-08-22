@@ -11,10 +11,18 @@ welcome to try it and share how it goes.
 
 ## Install
 
-### [Download the latest APK](https://github.com/teegles/Fold-Count/releases/download/v0.2.4-alpha/Fold-Count-v0.2.4-alpha.apk)
+### [Download the latest APK](https://github.com/teegles/Fold-Count/releases/download/v0.3.0-beta/Fold-Count-v0.3.0-beta.apk)
 
 Download the APK on your phone, open it, and allow installation from your
 browser or file manager if Android asks.
+
+## Screenshots
+
+<p>
+  <img src="docs/screenshots/today.jpg" alt="Today's Fold Count statistics" height="440">
+  <img src="docs/screenshots/seven-days.jpg" alt="Fold Count seven-day history" height="440">
+  <img src="docs/screenshots/all-time.jpg" alt="All-time Fold Count statistics" height="440">
+</p>
 
 ## Build from source
 

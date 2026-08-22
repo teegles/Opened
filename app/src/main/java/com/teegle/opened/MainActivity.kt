@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -78,6 +77,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.core.view.WindowCompat
+import androidx.core.net.toUri
 import kotlinx.coroutines.delay
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -273,7 +273,7 @@ private fun FoldCountApp(store: FoldStore, startTracking: () -> Unit, stopTracki
                                 context.startActivity(
                                     Intent(
                                         Intent.ACTION_VIEW,
-                                        Uri.parse("https://github.com/teegles/Fold-Count/blob/main/PRIVACY.md")
+                                        "https://github.com/teegles/Fold-Count/blob/main/PRIVACY.md".toUri()
                                     )
                                 )
                             }

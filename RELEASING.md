@@ -6,8 +6,13 @@ app-store builds. Never commit the keystore, its passwords, or
 
 ## One-time signing setup
 
-Create the key with the JDK `keytool`. Omitting password arguments keeps the
-passwords out of shell history:
+The official maintainer key was created for `v0.3.0-beta`. Its public
+certificate and fingerprint are documented in `signing/`. Do not generate a
+replacement for an official update: use the existing private key.
+
+For a fork or a brand-new application identity, create a different key with the
+JDK `keytool`. Omitting password arguments keeps the passwords out of shell
+history:
 
 ```bash
 keytool -genkeypair -v \
@@ -24,6 +29,12 @@ updates outside stores that manage the signing key.
 
 Copy `keystore.properties.example` to `keystore.properties`, fill in the
 absolute keystore path and credentials, and leave both local files untracked.
+
+On the maintainer workstation, the official key is under
+`~/.config/fold-count-signing/`, the gitignored build configuration is
+`keystore.properties`, and an encrypted recovery archive is staged in
+`~/Documents/Fold-Count-signing-backup/`. Copy that archive off the computer
+and save the `storePassword` from `keystore.properties` in a password manager.
 
 ## Verify and build
 

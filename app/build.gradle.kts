@@ -27,8 +27,8 @@ android {
         applicationId = "com.teegle.opened"
         minSdk = 31
         targetSdk = 36
-        versionCode = 15
-        versionName = "0.2.4-alpha"
+        versionCode = 16
+        versionName = "0.3.0-beta"
     }
 
     signingConfigs {

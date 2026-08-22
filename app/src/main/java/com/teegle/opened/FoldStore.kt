@@ -2,6 +2,7 @@ package com.teegle.opened
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -51,19 +52,19 @@ class FoldStore internal constructor(
     fun setTracking(enabled: Boolean, now: Long = System.currentTimeMillis()) {
         if (enabled && isTracking()) return
         if (!enabled) commitElapsed(now)
-        val editor = prefs.edit()
-            .putBoolean(KEY_TRACKING, enabled)
-            .putLong(KEY_STATE_STARTED, now)
-        if (enabled && !prefs.contains(KEY_TRACKING_STARTED)) {
-            editor.putString(KEY_TRACKING_STARTED, dayFor(now).toString())
+        prefs.edit {
+            putBoolean(KEY_TRACKING, enabled)
+            putLong(KEY_STATE_STARTED, now)
+            if (enabled && !prefs.contains(KEY_TRACKING_STARTED)) {
+                putString(KEY_TRACKING_STARTED, dayFor(now).toString())
+            }
         }
-        editor.apply()
     }
 
     @Synchronized
     fun checkpoint(now: Long = System.currentTimeMillis()) {
         commitElapsed(now)
-        prefs.edit().putLong(KEY_STATE_STARTED, now).apply()
+        prefs.edit { putLong(KEY_STATE_STARTED, now) }
     }
 
     fun isTracking(): Boolean = prefs.getBoolean(KEY_TRACKING, false)
@@ -71,14 +72,14 @@ class FoldStore internal constructor(
     /** Starts a fresh in-process timing boundary without counting time while the service was absent. */
     @Synchronized
     fun resumeTracking(interactive: Boolean, now: Long = System.currentTimeMillis()) {
-        val editor = prefs.edit()
-            .putBoolean(KEY_TRACKING, true)
-            .putBoolean(KEY_INTERACTIVE, interactive)
-            .putLong(KEY_STATE_STARTED, now)
-        if (!prefs.contains(KEY_TRACKING_STARTED)) {
-            editor.putString(KEY_TRACKING_STARTED, dayFor(now).toString())
+        prefs.edit {
+            putBoolean(KEY_TRACKING, true)
+            putBoolean(KEY_INTERACTIVE, interactive)
+            putLong(KEY_STATE_STARTED, now)
+            if (!prefs.contains(KEY_TRACKING_STARTED)) {
+                putString(KEY_TRACKING_STARTED, dayFor(now).toString())
+            }
         }
-        editor.apply()
     }
 
     @Synchronized
@@ -86,15 +87,15 @@ class FoldStore internal constructor(
         val previous = prefs.getBoolean(KEY_INTERACTIVE, false)
         if (previous == interactive) return
         commitElapsed(now)
-        prefs.edit()
-            .putBoolean(KEY_INTERACTIVE, interactive)
-            .putLong(KEY_STATE_STARTED, now)
-            .apply()
+        prefs.edit {
+            putBoolean(KEY_INTERACTIVE, interactive)
+            putLong(KEY_STATE_STARTED, now)
+        }
     }
 
     @Synchronized
     fun recordAngle(angle: Float, now: Long = System.currentTimeMillis()): Boolean {
-        prefs.edit().putFloat(KEY_ANGLE, angle).apply()
+        prefs.edit { putFloat(KEY_ANGLE, angle) }
         val previous = readState()
         val next = when {
             angle <= FOLDED_THRESHOLD -> FoldState.FOLDED
@@ -104,16 +105,15 @@ class FoldStore internal constructor(
         if (next == FoldState.UNKNOWN || next == previous) return false
 
         commitElapsed(now)
-        val editor = prefs.edit()
-            .putString(KEY_STATE, next.name)
-            .putLong(KEY_STATE_STARTED, now)
-
-        if (previous == FoldState.FOLDED && next == FoldState.OPEN) {
-            val day = dayFor(now)
-            editor.putInt(unfoldKey(day), prefs.getInt(unfoldKey(day), 0) + 1)
-            editor.putInt(KEY_TOTAL_UNFOLDS, prefs.getInt(KEY_TOTAL_UNFOLDS, 0) + 1)
+        prefs.edit {
+            putString(KEY_STATE, next.name)
+            putLong(KEY_STATE_STARTED, now)
+            if (previous == FoldState.FOLDED && next == FoldState.OPEN) {
+                val day = dayFor(now)
+                putInt(unfoldKey(day), prefs.getInt(unfoldKey(day), 0) + 1)
+                putInt(KEY_TOTAL_UNFOLDS, prefs.getInt(KEY_TOTAL_UNFOLDS, 0) + 1)
+            }
         }
-        editor.apply()
         return true
     }
 
@@ -179,14 +179,14 @@ class FoldStore internal constructor(
     fun reset(now: Long = System.currentTimeMillis()) {
         val tracking = isTracking()
         val interactive = prefs.getBoolean(KEY_INTERACTIVE, false)
-        prefs.edit()
-            .clear()
-            .putBoolean(KEY_TRACKING, tracking)
-            .putBoolean(KEY_INTERACTIVE, interactive)
-            .putInt(KEY_METRIC_VERSION, SCREEN_ON_METRIC_VERSION)
-            .putLong(KEY_STATE_STARTED, now)
-            .putString(KEY_TRACKING_STARTED, dayFor(now).toString())
-            .apply()
+        prefs.edit {
+            clear()
+            putBoolean(KEY_TRACKING, tracking)
+            putBoolean(KEY_INTERACTIVE, interactive)
+            putInt(KEY_METRIC_VERSION, SCREEN_ON_METRIC_VERSION)
+            putLong(KEY_STATE_STARTED, now)
+            putString(KEY_TRACKING_STARTED, dayFor(now).toString())
+        }
     }
 
     private fun readState(): FoldState = runCatching {
@@ -197,46 +197,44 @@ class FoldStore internal constructor(
         val state = readState()
         if (state == FoldState.UNKNOWN || !prefs.getBoolean(KEY_INTERACTIVE, false)) return
         var cursor = prefs.getLong(KEY_STATE_STARTED, end).coerceAtMost(end)
-        val editor = prefs.edit()
-
-        while (cursor < end) {
-            val date = dayFor(cursor)
-            val nextMidnight = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-            val segmentEnd = minOf(end, nextMidnight)
-            val duration = segmentEnd - cursor
-            val key = if (state == FoldState.OPEN) openKey(date) else foldedKey(date)
-            editor.putLong(key, prefs.getLong(key, 0L) + duration)
-            cursor = segmentEnd
+        prefs.edit {
+            while (cursor < end) {
+                val date = dayFor(cursor)
+                val nextMidnight = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+                val segmentEnd = minOf(end, nextMidnight)
+                val duration = segmentEnd - cursor
+                val key = if (state == FoldState.OPEN) openKey(date) else foldedKey(date)
+                putLong(key, prefs.getLong(key, 0L) + duration)
+                cursor = segmentEnd
+            }
         }
-        editor.apply()
     }
 
     private fun migrateToScreenOnDurations() {
         if (prefs.getInt(KEY_METRIC_VERSION, 1) >= SCREEN_ON_METRIC_VERSION) return
-        val editor = prefs.edit()
-        prefs.all.keys
-            .filter { it.endsWith("_open_ms") || it.endsWith("_folded_ms") }
-            .forEach(editor::remove)
-        editor
-            .putInt(KEY_METRIC_VERSION, SCREEN_ON_METRIC_VERSION)
-            .putBoolean(KEY_INTERACTIVE, false)
-            .putLong(KEY_STATE_STARTED, System.currentTimeMillis())
-            .apply()
+        prefs.edit {
+            prefs.all.keys
+                .filter { it.endsWith("_open_ms") || it.endsWith("_folded_ms") }
+                .forEach(::remove)
+            putInt(KEY_METRIC_VERSION, SCREEN_ON_METRIC_VERSION)
+            putBoolean(KEY_INTERACTIVE, false)
+            putLong(KEY_STATE_STARTED, System.currentTimeMillis())
+        }
     }
 
     private fun removeLegacyAppUsage() {
         val oldKeys = prefs.all.keys.filter { it.startsWith("app_") }
         if (oldKeys.isEmpty()) return
-        prefs.edit().also { editor -> oldKeys.forEach(editor::remove) }.apply()
+        prefs.edit { oldKeys.forEach(::remove) }
     }
 
     private fun ensureTrackingStartDate(now: Long = System.currentTimeMillis()) {
         if (prefs.contains(KEY_TRACKING_STARTED)) return
         val firstRecordedDay = storedDates().minOrNull()
         if (firstRecordedDay != null || isTracking()) {
-            prefs.edit()
-                .putString(KEY_TRACKING_STARTED, (firstRecordedDay ?: dayFor(now)).toString())
-                .apply()
+            prefs.edit {
+                putString(KEY_TRACKING_STARTED, (firstRecordedDay ?: dayFor(now)).toString())
+            }
         }
     }
 

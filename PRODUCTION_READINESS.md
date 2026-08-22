@@ -9,8 +9,8 @@ size came from publishing a debug build, not from unusually large app code.
 
 | Artifact | Before optimization | After R8/resource shrinking |
 | --- | ---: | ---: |
-| APK | 22.6 MB unsigned release | 1.79 MB unsigned release |
-| Android App Bundle | Not configured | 2.50 MB unsigned bundle |
+| APK | 22.6 MB unsigned release | 1.80 MB signed release |
+| Android App Bundle | Not configured | 2.51 MB signed bundle |
 | Published debug APK | 29.3 MB | Debug builds intentionally remain large |
 
 ## Completed hardening
@@ -28,22 +28,22 @@ size came from publishing a debug build, not from unusually large app code.
 - Improved selector accessibility semantics and notification update behavior.
 - Removed obsolete resources and unnecessary pre-Android-12 theme branches.
 
-## Required before the first permanent release
+## Required before wider distribution
 
-1. Decide whether existing debug-build statistics need export/import support.
-   Without it, current testers must uninstall the debug build and lose their
-   statistics before installing the permanently signed build.
-2. Generate the permanent app-signing keystore, record its certificate
-   fingerprints, and make at least two encrypted backups.
-3. Build and verify the signed APK and AAB using `RELEASING.md`.
-4. Install the optimized signed APK on the OnePlus Open and Galaxy Z Flip7 and
+1. Install the optimized signed APK on the OnePlus Open and Galaxy Z Flip7 and
    verify tracking, reboot restart, notification permission, and dark/light UI.
-5. Preserve the R8 mapping file alongside every optimized release.
+2. Copy the encrypted permanent-signing backup off this computer and record its
+   password in a password manager.
+3. Preserve the R8 mapping file alongside every optimized release.
+
+The first permanent release intentionally does not migrate statistics from the
+old debug-signed build. Existing testers must uninstall that build first.
 
 ## Store work
 
-- Prepare at least two current screenshots, a 512 px store icon, descriptions,
-  contact details, and a content-rating questionnaire.
+- Two Play-compatible phone screenshots and draft listing copy are ready in
+  `docs/screenshots` and `STORE_LISTING.md`. A 512 px store icon, contact
+  details, and the content-rating questionnaire remain.
 - Complete the Data safety form as no data collected or shared.
 - Submit the `specialUse` foreground-service declaration with a short video
   showing Start tracking, the live notification, fold detection, and Stop
