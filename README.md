@@ -24,23 +24,17 @@ browser or file manager if Android asks.
   <img src="docs/screenshots/all-time.jpg" alt="All-time Fold Count statistics" height="440">
 </p>
 
-## Build from source
+## Development
 
-Open this project in Android Studio, or run the tests and debug build:
-
-```bash
-./gradlew testDebugUnitTest lintDebug assembleDebug
-```
-
-The APK will be created at `app/build/outputs/apk/debug/app-debug.apk`.
+The source is available for developers under the MIT license. Regular users
+should install the signed APK above. Maintainers can follow the
+[release guide](RELEASING.md).
 
 ## Privacy
 
 Fold Count has no internet, location, or app-usage access. Android requires a
 persistent notification so tracking can continue in the background. See the
 [privacy policy](PRIVACY.md).
-
-Release maintainers can use the [release guide](RELEASING.md).
 
 ## License
 
