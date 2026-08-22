@@ -77,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import kotlinx.coroutines.delay
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.time.format.TextStyle
 
 class MainActivity : ComponentActivity() {
@@ -134,7 +135,8 @@ private fun FoldCountApp(store: FoldStore, startTracking: () -> Unit, stopTracki
     val context = LocalContext.current
     var snapshot by remember { mutableStateOf(store.snapshot()) }
     var week by remember { mutableStateOf(store.lastSevenDays()) }
-    var showingWeek by remember { mutableStateOf(false) }
+    var lifetime by remember { mutableStateOf(store.lifetimeUsage()) }
+    var period by remember { mutableStateOf(UsagePeriod.TODAY) }
     var showResetDialog by remember { mutableStateOf(false) }
     val notificationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -147,6 +149,7 @@ private fun FoldCountApp(store: FoldStore, startTracking: () -> Unit, stopTracki
         while (true) {
             snapshot = store.snapshot()
             week = store.lastSevenDays()
+            lifetime = store.lifetimeUsage()
             delay(1_000)
         }
     }
@@ -161,6 +164,7 @@ private fun FoldCountApp(store: FoldStore, startTracking: () -> Unit, stopTracki
                     store.reset()
                     snapshot = store.snapshot()
                     week = store.lastSevenDays()
+                    lifetime = store.lifetimeUsage()
                     showResetDialog = false
                 }) { Text("Reset") }
             },
@@ -213,8 +217,9 @@ private fun FoldCountApp(store: FoldStore, startTracking: () -> Unit, stopTracki
                 UsageCard(
                     snapshot = snapshot,
                     days = week,
-                    showingWeek = showingWeek,
-                    onTogglePeriod = { showingWeek = !showingWeek }
+                    lifetime = lifetime,
+                    period = period,
+                    onSelectPeriod = { period = it }
                 )
             }
             item {
@@ -344,12 +349,25 @@ private fun FoldGlyph(state: FoldState) {
 private fun UsageCard(
     snapshot: FoldSnapshot,
     days: List<DailyUsage>,
-    showingWeek: Boolean,
-    onTogglePeriod: () -> Unit
+    lifetime: LifetimeUsage,
+    period: UsagePeriod,
+    onSelectPeriod: (UsagePeriod) -> Unit
 ) {
-    val openMs = if (showingWeek) days.sumOf { it.openMs } else snapshot.todayOpenMs
-    val closedMs = if (showingWeek) days.sumOf { it.foldedMs } else snapshot.todayFoldedMs
-    val unfolds = if (showingWeek) days.sumOf { it.unfolds } else snapshot.todayUnfolds
+    val openMs = when (period) {
+        UsagePeriod.TODAY -> snapshot.todayOpenMs
+        UsagePeriod.SEVEN_DAYS -> days.sumOf { it.openMs }
+        UsagePeriod.ALL_TIME -> lifetime.openMs
+    }
+    val closedMs = when (period) {
+        UsagePeriod.TODAY -> snapshot.todayFoldedMs
+        UsagePeriod.SEVEN_DAYS -> days.sumOf { it.foldedMs }
+        UsagePeriod.ALL_TIME -> lifetime.foldedMs
+    }
+    val unfolds = when (period) {
+        UsagePeriod.TODAY -> snapshot.todayUnfolds
+        UsagePeriod.SEVEN_DAYS -> days.sumOf { it.unfolds }
+        UsagePeriod.ALL_TIME -> lifetime.unfolds
+    }
     val total = openMs + closedMs
     val fraction = if (total > 0) openMs.toFloat() / total else 0f
     Card(
@@ -357,7 +375,18 @@ private fun UsageCard(
         shape = RoundedCornerShape(28.dp)
     ) {
         Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            PeriodToggle(showingWeek, onTogglePeriod)
+            PeriodToggle(period, onSelectPeriod)
+            if (period == UsagePeriod.ALL_TIME) {
+                val locale = LocalConfiguration.current.locales[0]
+                val formatter = remember(locale) {
+                    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+                }
+                Text(
+                    "Since ${lifetime.started.format(formatter)}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Text(
                 "$unfolds unfolds",
                 style = MaterialTheme.typography.titleMedium,
@@ -386,15 +415,17 @@ private fun UsageCard(
                     drawStopIndicator = {}
                 )
             }
-            if (showingWeek) {
+            if (period == UsagePeriod.SEVEN_DAYS) {
                 WeeklyBars(days)
             }
         }
     }
 }
 
+private enum class UsagePeriod { TODAY, SEVEN_DAYS, ALL_TIME }
+
 @Composable
-private fun PeriodToggle(showingWeek: Boolean, onTogglePeriod: () -> Unit) {
+private fun PeriodToggle(period: UsagePeriod, onSelectPeriod: (UsagePeriod) -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().height(52.dp),
         shape = CircleShape,
@@ -402,14 +433,14 @@ private fun PeriodToggle(showingWeek: Boolean, onTogglePeriod: () -> Unit) {
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val indicatorOffset by animateDpAsState(
-                targetValue = if (showingWeek) maxWidth / 2 else 0.dp,
+                targetValue = maxWidth / 3 * period.ordinal,
                 animationSpec = tween(durationMillis = 280),
                 label = "period indicator"
             )
             Surface(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(maxWidth / 2)
+                    .width(maxWidth / 3)
                     .offset(x = indicatorOffset),
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary
@@ -417,15 +448,21 @@ private fun PeriodToggle(showingWeek: Boolean, onTogglePeriod: () -> Unit) {
             Row(Modifier.fillMaxSize()) {
                 PeriodOption(
                     label = "Today",
-                    selected = !showingWeek,
+                    selected = period == UsagePeriod.TODAY,
                     modifier = Modifier.weight(1f).fillMaxHeight(),
-                    onClick = { if (showingWeek) onTogglePeriod() }
+                    onClick = { onSelectPeriod(UsagePeriod.TODAY) }
                 )
                 PeriodOption(
-                    label = "Past 7 Days",
-                    selected = showingWeek,
+                    label = "7 Days",
+                    selected = period == UsagePeriod.SEVEN_DAYS,
                     modifier = Modifier.weight(1f).fillMaxHeight(),
-                    onClick = { if (!showingWeek) onTogglePeriod() }
+                    onClick = { onSelectPeriod(UsagePeriod.SEVEN_DAYS) }
+                )
+                PeriodOption(
+                    label = "All Time",
+                    selected = period == UsagePeriod.ALL_TIME,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onClick = { onSelectPeriod(UsagePeriod.ALL_TIME) }
                 )
             }
         }

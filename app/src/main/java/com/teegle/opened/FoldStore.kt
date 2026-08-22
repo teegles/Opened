@@ -24,6 +24,13 @@ data class DailyUsage(
     val foldedMs: Long
 )
 
+data class LifetimeUsage(
+    val started: LocalDate,
+    val unfolds: Int,
+    val openMs: Long,
+    val foldedMs: Long
+)
+
 class FoldStore(context: Context) {
     private val prefs = context.getSharedPreferences("fold_tracking", Context.MODE_PRIVATE)
     private val zone: ZoneId get() = ZoneId.systemDefault()
@@ -31,16 +38,20 @@ class FoldStore(context: Context) {
     init {
         migrateToScreenOnDurations()
         removeLegacyAppUsage()
+        ensureTrackingStartDate()
     }
 
     @Synchronized
     fun setTracking(enabled: Boolean, now: Long = System.currentTimeMillis()) {
         if (enabled && isTracking()) return
         if (!enabled) commitElapsed(now)
-        prefs.edit()
+        val editor = prefs.edit()
             .putBoolean(KEY_TRACKING, enabled)
             .putLong(KEY_STATE_STARTED, now)
-            .apply()
+        if (enabled && !prefs.contains(KEY_TRACKING_STARTED)) {
+            editor.putString(KEY_TRACKING_STARTED, dayFor(now).toString())
+        }
+        editor.apply()
     }
 
     @Synchronized
@@ -133,6 +144,19 @@ class FoldStore(context: Context) {
     }
 
     @Synchronized
+    fun lifetimeUsage(now: Long = System.currentTimeMillis()): LifetimeUsage {
+        val today = dayFor(now)
+        val current = snapshot(now)
+        val pastDays = storedDates().filter { it != today }
+        return LifetimeUsage(
+            started = trackingStartDate(now),
+            unfolds = current.totalUnfolds,
+            openMs = pastDays.sumOf { prefs.getLong(openKey(it), 0L) } + current.todayOpenMs,
+            foldedMs = pastDays.sumOf { prefs.getLong(foldedKey(it), 0L) } + current.todayFoldedMs
+        )
+    }
+
+    @Synchronized
     fun reset(now: Long = System.currentTimeMillis()) {
         val tracking = isTracking()
         val interactive = prefs.getBoolean(KEY_INTERACTIVE, false)
@@ -142,6 +166,7 @@ class FoldStore(context: Context) {
             .putBoolean(KEY_INTERACTIVE, interactive)
             .putInt(KEY_METRIC_VERSION, SCREEN_ON_METRIC_VERSION)
             .putLong(KEY_STATE_STARTED, now)
+            .putString(KEY_TRACKING_STARTED, dayFor(now).toString())
             .apply()
     }
 
@@ -186,6 +211,28 @@ class FoldStore(context: Context) {
         prefs.edit().also { editor -> oldKeys.forEach(editor::remove) }.apply()
     }
 
+    private fun ensureTrackingStartDate(now: Long = System.currentTimeMillis()) {
+        if (prefs.contains(KEY_TRACKING_STARTED)) return
+        val firstRecordedDay = storedDates().minOrNull()
+        if (firstRecordedDay != null || isTracking()) {
+            prefs.edit()
+                .putString(KEY_TRACKING_STARTED, (firstRecordedDay ?: dayFor(now)).toString())
+                .apply()
+        }
+    }
+
+    private fun trackingStartDate(now: Long): LocalDate {
+        val stored = prefs.getString(KEY_TRACKING_STARTED, null)
+        return stored?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            ?: storedDates().minOrNull()
+            ?: dayFor(now)
+    }
+
+    private fun storedDates(): Set<LocalDate> = prefs.all.keys.mapNotNullTo(mutableSetOf()) { key ->
+        val match = DAY_KEY.matchEntire(key) ?: return@mapNotNullTo null
+        runCatching { LocalDate.parse(match.groupValues[1]) }.getOrNull()
+    }
+
     private fun dayFor(time: Long): LocalDate = Instant.ofEpochMilli(time).atZone(zone).toLocalDate()
     private fun openKey(day: LocalDate) = "day_${day}_open_ms"
     private fun foldedKey(day: LocalDate) = "day_${day}_folded_ms"
@@ -201,6 +248,8 @@ class FoldStore(context: Context) {
         private const val KEY_TOTAL_UNFOLDS = "total_unfolds"
         private const val KEY_INTERACTIVE = "interactive"
         private const val KEY_METRIC_VERSION = "metric_version"
+        private const val KEY_TRACKING_STARTED = "tracking_started"
         private const val SCREEN_ON_METRIC_VERSION = 2
+        private val DAY_KEY = Regex("^day_(\\d{4}-\\d{2}-\\d{2})_(?:open_ms|folded_ms|unfolds)$")
     }
 }
