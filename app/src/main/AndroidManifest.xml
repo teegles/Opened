@@ -4,9 +4,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-feature
+        android:name="android.hardware.sensor.hinge_angle"
+        android:required="true" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="Fold Count"
         android:supportsRtl="true"
@@ -27,7 +31,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Tracks fold and unfold events using the device hinge sensor at the user's request" />
+                android:value="User-started continuous hinge monitoring. It must run immediately and continuously so unfold events and opened/closed screen time are not missed while the app is closed. The user sees a persistent notification and can stop tracking in the app." />
         </service>
 
         <receiver

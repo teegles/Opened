@@ -1,6 +1,7 @@
 package com.teegle.opened
 
 import android.content.Context
+import android.content.SharedPreferences
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -31,9 +32,14 @@ data class LifetimeUsage(
     val foldedMs: Long
 )
 
-class FoldStore(context: Context) {
-    private val prefs = context.getSharedPreferences("fold_tracking", Context.MODE_PRIVATE)
-    private val zone: ZoneId get() = ZoneId.systemDefault()
+class FoldStore internal constructor(
+    private val prefs: SharedPreferences,
+    private val zone: ZoneId
+) {
+    constructor(context: Context) : this(
+        context.getSharedPreferences("fold_tracking", Context.MODE_PRIVATE),
+        ZoneId.systemDefault()
+    )
 
     init {
         migrateToScreenOnDurations()
@@ -61,6 +67,19 @@ class FoldStore(context: Context) {
     }
 
     fun isTracking(): Boolean = prefs.getBoolean(KEY_TRACKING, false)
+
+    /** Starts a fresh in-process timing boundary without counting time while the service was absent. */
+    @Synchronized
+    fun resumeTracking(interactive: Boolean, now: Long = System.currentTimeMillis()) {
+        val editor = prefs.edit()
+            .putBoolean(KEY_TRACKING, true)
+            .putBoolean(KEY_INTERACTIVE, interactive)
+            .putLong(KEY_STATE_STARTED, now)
+        if (!prefs.contains(KEY_TRACKING_STARTED)) {
+            editor.putString(KEY_TRACKING_STARTED, dayFor(now).toString())
+        }
+        editor.apply()
+    }
 
     @Synchronized
     fun recordInteractive(interactive: Boolean, now: Long = System.currentTimeMillis()) {
@@ -107,7 +126,7 @@ class FoldStore(context: Context) {
 
         if (isTracking() && prefs.getBoolean(KEY_INTERACTIVE, false) && state != FoldState.UNKNOWN) {
             val started = prefs.getLong(KEY_STATE_STARTED, now).coerceAtMost(now)
-            val todayStart = LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
+            val todayStart = today.atStartOfDay(zone).toInstant().toEpochMilli()
             val currentElapsed = now - maxOf(started, todayStart)
             if (state == FoldState.OPEN) openMs += currentElapsed
             if (state == FoldState.FOLDED) foldedMs += currentElapsed

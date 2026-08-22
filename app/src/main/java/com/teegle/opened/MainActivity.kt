@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -15,8 +16,9 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -50,10 +52,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -72,8 +73,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.core.view.WindowCompat
 import kotlinx.coroutines.delay
 import java.time.format.DateTimeFormatter
@@ -112,12 +115,7 @@ private fun FoldCountTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
     val view = LocalView.current
     val dark = isSystemInDarkTheme()
-    val colors = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dark -> dynamicDarkColorScheme(context)
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> dynamicLightColorScheme(context)
-        dark -> darkColorScheme(primary = Color(0xFF79C7A2), secondary = Color(0xFFB2CCBD))
-        else -> lightColorScheme(primary = Color(0xFF315C49), secondary = Color(0xFF526A5E))
-    }
+    val colors = if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
@@ -264,12 +262,23 @@ private fun FoldCountApp(store: FoldStore, startTracking: () -> Unit, stopTracki
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                     shape = RoundedCornerShape(20.dp)
                 ) {
-                    Text(
-                        "Everything stays on this phone. Fold Count has no internet, location, or app-usage access.",
-                        modifier = Modifier.padding(18.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(Modifier.padding(18.dp)) {
+                        Text(
+                            "Everything stays on this phone. Fold Count has no internet, location, or app-usage access.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://github.com/teegles/Fold-Count/blob/main/PRIVACY.md")
+                                    )
+                                )
+                            }
+                        ) { Text("Privacy policy") }
+                    }
                 }
             }
             }
@@ -441,11 +450,11 @@ private fun PeriodToggle(period: UsagePeriod, onSelectPeriod: (UsagePeriod) -> U
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(maxWidth / 3)
-                    .offset(x = indicatorOffset),
+                    .offset { IntOffset(indicatorOffset.roundToPx(), 0) },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary
             ) {}
-            Row(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxSize().selectableGroup()) {
                 PeriodOption(
                     label = "Today",
                     selected = period == UsagePeriod.TODAY,
@@ -477,7 +486,11 @@ private fun PeriodOption(
     onClick: () -> Unit
 ) {
     Box(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.selectable(
+            selected = selected,
+            onClick = onClick,
+            role = Role.Tab
+        ),
         contentAlignment = Alignment.Center
     ) {
         Text(

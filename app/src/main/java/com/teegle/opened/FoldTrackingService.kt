@@ -16,19 +16,32 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 
 class FoldTrackingService : Service(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private lateinit var store: FoldStore
     private var hingeSensor: Sensor? = null
+    private var screenReceiverRegistered = false
+    private val checkpointHandler = Handler(Looper.getMainLooper())
+    private val checkpoint = object : Runnable {
+        override fun run() {
+            if (store.isTracking()) {
+                store.checkpoint()
+                checkpointHandler.postDelayed(this, CHECKPOINT_INTERVAL_MS)
+            }
+        }
+    }
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_ON -> store.recordInteractive(true)
                 Intent.ACTION_SCREEN_OFF -> store.recordInteractive(false)
             }
+            updateNotification(currentStatus())
         }
     }
 
@@ -38,10 +51,10 @@ class FoldTrackingService : Service(), SensorEventListener {
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         hingeSensor = sensorManager.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE)
         createChannel()
-        startAsForeground(notification("${store.snapshot().todayUnfolds} unfolds today"))
-        store.setTracking(true)
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
-        store.recordInteractive(powerManager.isInteractive)
+        store.resumeTracking(powerManager.isInteractive)
+        checkpointHandler.postDelayed(checkpoint, CHECKPOINT_INTERVAL_MS)
+        startAsForeground(notification("${store.snapshot().todayUnfolds} unfolds today"))
         val screenFilter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_SCREEN_OFF)
@@ -51,9 +64,11 @@ class FoldTrackingService : Service(), SensorEventListener {
         } else {
             registerReceiver(screenReceiver, screenFilter)
         }
-        hingeSensor?.let {
+        screenReceiverRegistered = true
+        val listening = hingeSensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
-        } ?: updateNotification("Hinge sensor unavailable")
+        } ?: false
+        if (!listening) updateNotification("Hinge sensor unavailable")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -62,7 +77,8 @@ class FoldTrackingService : Service(), SensorEventListener {
 
     override fun onDestroy() {
         sensorManager.unregisterListener(this)
-        unregisterReceiver(screenReceiver)
+        checkpointHandler.removeCallbacks(checkpoint)
+        if (screenReceiverRegistered) unregisterReceiver(screenReceiver)
         if (store.isTracking()) store.checkpoint()
         super.onDestroy()
     }
@@ -71,15 +87,7 @@ class FoldTrackingService : Service(), SensorEventListener {
         if (event.sensor.type != Sensor.TYPE_HINGE_ANGLE) return
         val angle = event.values.firstOrNull() ?: return
         val changed = store.recordAngle(angle)
-        if (changed) {
-            val snapshot = store.snapshot()
-            val state = when (snapshot.state) {
-                FoldState.FOLDED -> "Closed"
-                FoldState.OPEN -> "Opened"
-                FoldState.UNKNOWN -> "Waiting"
-            }
-            updateNotification("$state · ${snapshot.todayUnfolds} unfolds today")
-        }
+        if (changed) updateNotification(currentStatus())
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -98,6 +106,16 @@ class FoldTrackingService : Service(), SensorEventListener {
             .notify(NOTIFICATION_ID, notification(message))
     }
 
+    private fun currentStatus(): String {
+        val snapshot = store.snapshot()
+        val state = when (snapshot.state) {
+            FoldState.FOLDED -> "Closed"
+            FoldState.OPEN -> "Opened"
+            FoldState.UNKNOWN -> "Waiting"
+        }
+        return "$state · ${snapshot.todayUnfolds} unfolds today"
+    }
+
     private fun notification(message: String): Notification {
         val openIntent = PendingIntent.getActivity(
             this,
@@ -111,6 +129,8 @@ class FoldTrackingService : Service(), SensorEventListener {
             .setContentText(message)
             .setContentIntent(openIntent)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
             .setColor(Color.rgb(49, 92, 73))
             .setCategory(Notification.CATEGORY_SERVICE)
             .build()
@@ -132,5 +152,6 @@ class FoldTrackingService : Service(), SensorEventListener {
     companion object {
         private const val CHANNEL_ID = "fold_tracking"
         private const val NOTIFICATION_ID = 1001
+        private const val CHECKPOINT_INTERVAL_MS = 60_000L
     }
 }

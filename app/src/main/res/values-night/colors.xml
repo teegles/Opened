@@ -1,11 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="opened_background">#101713</color>
-    <color name="opened_ink">#E7F0EA</color>
-    <color name="opened_muted">#AAB8B0</color>
     <color name="opened_accent">#79C7A2</color>
-    <color name="opened_stop">#9E6F62</color>
-    <color name="opened_danger">#E3A096</color>
-    <color name="opened_button_text">#FFFFFF</color>
-    <color name="opened_folded_bar">#46544D</color>
 </resources>
